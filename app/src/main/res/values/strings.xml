@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">HTTP Data Viewer</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_speedometer">Speed</string>
+    <string name="tab_graph">Graph</string>
+
+    <!-- Top Bar Titles -->
+    <string name="title_home">Data Fetcher</string>
+    <string name="title_speedometer">Speedometer</string>
+    <string name="title_graph">Data Graph</string>
+
+    <!-- Home Screen -->
+    <string name="btn_fetch_data">Fetch JSON Data</string>
+    <string name="label_response_data">Received Data:</string>
+    <string name="loading">Loading...</string>
+    <string name="error_prefix">Error: %s</string>
+
+    <string name="back_description">Back</string>
+</resources>
