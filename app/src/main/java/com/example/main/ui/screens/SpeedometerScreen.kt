@@ -1,5 +1,6 @@
 package com.example.main.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -13,7 +14,9 @@ import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.main.statemgmt.AppViewModel
@@ -22,29 +25,36 @@ import kotlin.math.sin
 
 /**
  * The Speedometer Screen.
- * 
- * Instead of a library, we use a custom Canvas approach here. 
- * Why? Because it helps you understand how drawing works in Compose, 
- * which is a fundamental skill for custom UI components.
  */
 @Composable
 fun SpeedometerScreen(viewModel: AppViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val puls = uiState.lastReceivedData?.puls ?: 0
     
-    // LaunchedEffect starts polling when this screen is shown.
-    // By using "Unit" as the key, it runs only once when entering the screen.
+    // LEARNING POINT: Handling orientation in custom UI
+    // We adjust the layout and the size of the gauge based on screen orientation.
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
     LaunchedEffect(Unit) {
         viewModel.startPolling(intervalMs = 1000)
     }
     
-    // DisposableEffect ensures we stop the background work when leaving.
     DisposableEffect(Unit) {
         onDispose {
             viewModel.stopPolling()
         }
     }
 
+    if (isLandscape) {
+        SpeedometerLandscape(puls)
+    } else {
+        SpeedometerPortrait(puls)
+    }
+}
+
+@Composable
+fun SpeedometerPortrait(puls: Int) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -57,23 +67,45 @@ fun SpeedometerScreen(viewModel: AppViewModel) {
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // The Speedometer Visual
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(300.dp)
-        ) {
-            SpeedometerView(value = puls.toFloat(), min = 40f, max = 180f)
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$puls",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 64.sp
-                    )
+        SpeedometerVisual(puls, size = 300.dp)
+    }
+}
+
+@Composable
+fun SpeedometerLandscape(puls: Int) {
+    Row(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Text(
+            text = "Current Heart Rate",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        // We use a smaller size (200dp) so it fits vertically in landscape
+        SpeedometerVisual(puls, size = 200.dp)
+    }
+}
+
+@Composable
+fun SpeedometerVisual(puls: Int, size: Dp) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(size)
+    ) {
+        SpeedometerView(value = puls.toFloat(), min = 40f, max = 180f)
+        
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "$puls",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (size < 250.dp) 48.sp else 64.sp
                 )
-                Text(text = "BPM", style = MaterialTheme.typography.labelLarge)
-            }
+            )
+            Text(text = "BPM", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

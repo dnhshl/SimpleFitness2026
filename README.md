@@ -1,88 +1,60 @@
 # 🏃 SimpleFitness Educational App
 
-Welcome to the **SimpleFitness** project! Building upon your experience with the **SimpleSensor** app, this project takes the next big step: **Networking** and **Advanced Data Visualization**.
+Welcome to the latest version of the **SimpleFitness** project! 
 
-Instead of reading local hardware sensors, this app communicates with a remote server to fetch "Live" fitness data and displays it in a professional-grade scrollable graph.
+While the initial version of **SimpleFitness** (from last term) was built upon your experience with the **SimpleSensor** app, this updated version takes that foundation and adds professional architectural concepts: **Adaptive UI** and **Advanced Visualization**.
 
-## 🎓 The "Discovery" Approach
-We continue our **"Reverse Engineering"** approach:
-1.  **Explore**: Run the app and watch the pulse graph update in real-time as data comes in from the cloud.
-2.  **Understand**: Trace the path from a JSON string on the internet, through the **Ktor** client, into a Kotlin data class, and finally onto the **Vico** chart.
-3.  **Modify**: Your goal is to customize the dashboard, handle new data fields, and tune the graphing behavior.
+## 🎓 Learning Module: Configuration & Adaptivity
+This version introduces a "Configuration-First" approach. Instead of hard-coding buttons and bars, we define the app structure in one place (`AppConfig.kt`), and the UI adapts automatically.
 
----
+### 📱 1. Adaptive Navigation (The "Rail" Pattern)
+Mobile apps must work in both **Portrait** and **Landscape**. 
+*   **Portrait**: The app uses a standard `NavigationBar` (Bottom Bar).
+*   **Landscape**: To save vertical space for the graph, the app automatically switches to a `NavigationRail` (Side Bar) and hides the `TopAppBar`.
+*   **The Magic**: Both components are driven by the same list of screens in `AppConfig.kt`.
 
-## 🏗️ Architecture: The Web Pipeline
-We follow the same 3-layer architecture, but the "source" has changed from hardware to the web:
-
-### 1. The Repository (The "Gateway")
-*   **Location**: `com.example.main.repositories.HttpRepository`
-*   **Purpose**: This layer manages the internet connection.
-*   **Concepts**: 
-    *   **Ktor**: An asynchronous HTTP client for Android.
-    *   **JSON Serialization**: Using `kotlinx-serialization` to automatically turn a JSON string (like `{"puls": 80, ...}`) into a `FitnessData` object.
-
-### 2. The ViewModel (The "Orchestrator")
-*   **Location**: `com.example.main.statemgmt.AppViewModel`
-*   **Purpose**: Handles the **Polling Logic**.
-*   **Concept**: It uses a "Pulse" timer to fetch new data every 2 seconds and maintains a `fitnessHistory` list that powers the graph.
-
-### 3. The UI (The "Dashboard")
-*   **Location**: `com.example.main.ui.screens`
-*   **Purpose**: Visualizing data using **Jetpack Compose** and **Vico**.
-*   **Key Files**: 
-    *   `HomeScreen.kt`: Shows the raw current values.
-    *   `GraphScreen.kt`: The advanced graphing implementation.
-    *   `Helper.kt`: Contains `TimeHelper` which handles the tricky conversion from UTC "Web Time" to your local Time Zone.
+### 📊 2. Graph Customization (Vico Library)
+We've moved beyond "default" charts to a professional, readable implementation:
+*   **Axis Control**: We use `ItemPlacer` to control how often labels appear.
+*   **Stability**: We fixed the "flicker" by giving the Y-axis a fixed width. This is a common requirement in live-data dashboards.
 
 ---
 
-## 📈 Key Technologies
-
-### 🌐 Ktor & JSON
-The app talks to a REST API. You can see the data structure in `UiState.kt`. Notice how the `@Serializable` annotation tells the compiler how to handle the data.
-
-### 📊 Vico Graphing (v3.0)
-We use the **Vico** library for the line chart.
-*   **Real-time**: The `CartesianChartHost` updates instantly when new data arrives.
-*   **Interaction**: You can pinch to zoom and swipe to scroll through the history.
-*   **Formatting**: Look at the `xAxisValueFormatter` in `GraphScreen.kt` to see how we turn indices into timestamps.
+## 🏗️ Architecture Reminder
+We strictly follow the 3-layer architecture:
+1.  **Repository**: `HttpRepository.kt` manages the **Ktor** connection.
+2.  **ViewModel**: `AppViewModel.kt` handles data polling and the navigation state.
+3.  **UI**: `ui/screens/` displays the data. The entry point is `MainActivity.kt`.
 
 ---
 
-## 🛠️ Your Tasks
+## 🛠️ Student Tasks
 
-### Task 1: Add the "Fitness" Score
-Currently, the graph only shows the **Pulse**. The API also returns a `fitness` value (a double).
-1.  Modify `GraphScreen.kt` to either show a second line for fitness or switch the current line to display the fitness value instead of pulse.
-2.  Update the Y-axis scale (in `rangeProvider`) to reflect the range of the fitness score.
+### Task 1: The "Automatic" UI (Configuration)
+Your "Control Center" is `AppConfig.kt`. 
+1.  **Modify**: Change the icons for the `Home` or `Graph` screens in `AppScreenConfigs`.
+2.  **Verify**: Run the app and rotate your phone. Notice how your new icons appear in both the Bottom Bar AND the Side Rail automatically.
 
-### Task 2: UI Styling
-Customize the look of the graph in `GraphScreen.kt`:
-1.  Change the color of the line and the dots to something else (e.g., `Color.Red` or `Color.Green`).
-2.  Change the `CircleShape` of the dots to a `RectangleShape` or something custom.
+### Task 2: Adding a New Feature
+Suppose you want to add a "Settings" tab.
+1.  **Action**: Add a new `ScreenConfig` object to the list in `AppConfig.kt`. Give it a title and an icon.
+2.  **Result**: Without touching any layout code, your new tab should appear in the navigation. (Note: Clicking it will show an error until you also add it to the `when` block in `MainActivity.kt`).
 
-### Task 3: Polling Control
-1.  Find where the polling interval is defined. Can you make the app update every 5 seconds instead of 2?
-2.  What happens to the graph's auto-scroll behavior when you change the interval?
+### Task 3: Graph Precision
+In `GraphScreen.kt`, the Y-axis shows a label every 20 BPM.
+1.  **Modify**: Find the `VerticalAxis.ItemPlacer.step` and change it to show a label every **10 BPM**.
+2.  **Analyze**: Look at the `size = BaseAxis.Size.Fixed(72.dp)` line. Why is this fixed size important when the heart rate changes from 99 to 100?
 
 ---
 
 ## 📚 Helpful Resources
-*   **Ktor Documentation**: [Getting started with Ktor on Android](https://ktor.io/docs/http-client-android.html)
-*   **Vico Documentation**: [Vico Graphing Guide](https://guide.vico.patrykandpatrick.com/)
-*   **Kotlin Serialization**: [JSON handling in Kotlin](https://github.com/Kotlin/kotlinx.serialization/blob/master/docs/json.md)
+*   **Vico Documentation**: [Axis customization](https://guide.vico.patrykandpatrick.com/core/axis/)
+*   **Material 3**: [Adaptive layouts with Navigation Rail](https://m3.material.io/components/navigation-rail/overview)
 
 ---
 
 ## 📁 Project Quick-Link
-*   **Networking**: `HttpRepository.kt` -> Where the web requests happen.
-*   **Logic**: `AppViewModel.kt` -> Where the data is polled and stored.
-*   **Data Structure**: `UiState.kt` -> Where the JSON format is defined.
-*   **Time Logic**: `Helper.kt` -> Where Time Zones are managed.
-*   **UI Layout**: `ui/screens/` -> Where the screens and charts are designed.
-
----
-
-## ⚖️ License
-This project is licensed under the **MIT License**.
+*   **The Config**: `AppConfig.kt` -> Start here!
+*   **The Brain**: `AppViewModel.kt`.
+*   **The Layout**: `MainActivity.kt` -> See how it handles rotation.
+*   **The Screens**: `GraphScreen.kt`, `HomeScreen.kt`, `SpeedometerScreen.kt`.

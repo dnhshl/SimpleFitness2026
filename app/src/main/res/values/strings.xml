@@ -18,4 +18,8 @@
     <string name="error_prefix">Error: %s</string>
 
     <string name="back_description">Back</string>
+
+    <!-- Graph Screen -->
+    <string name="label_axis_time">Time</string>
+    <string name="label_axis_heart_rate">Heart Rate (BPM)</string>
 </resources>

@@ -18,7 +18,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
  * A central DataStore manager that uses JSON serialization.
  * 
  * You usually don't need to change anything here.
- * This class handles saving/loading the entire 'PersistantUiState' object 
+ * This class handles saving/loading the entire 'PersistentUiState' object 
  * as a single JSON string.
  */
 class DataStoreManager(private val context: Context) {
@@ -26,27 +26,27 @@ class DataStoreManager(private val context: Context) {
     private val jsonKey = stringPreferencesKey("app_state_json")
 
     // Read the entire state object from DataStore
-    val persistantUiState: Flow<PersistantUiState> = context.dataStore.data.map { preferences ->
+    val persistentUiState: Flow<PersistentUiState> = context.dataStore.data.map { preferences ->
         val json = preferences[jsonKey]
         if (json != null) {
             try {
-                Json.decodeFromString<PersistantUiState>(json)
+                Json.decodeFromString<PersistentUiState>(json)
             } catch (e: Exception) {
-                PersistantUiState() // Return default state on error
+                PersistentUiState() // Return default state on error
             }
         } else {
-            PersistantUiState() // Return default state if no data exists
+            PersistentUiState() // Return default state if no data exists
         }
     }
 
     // Write the entire state object to DataStore
-    suspend fun updatePersistantState(update: (PersistantUiState) -> PersistantUiState) {
+    suspend fun updatePersistentState(update: (PersistentUiState) -> PersistentUiState) {
         context.dataStore.edit { preferences ->
             val currentJson = preferences[jsonKey]
             val current = if (currentJson != null) {
-                try { Json.decodeFromString<PersistantUiState>(currentJson) } catch (e: Exception) { PersistantUiState() }
+                try { Json.decodeFromString<PersistentUiState>(currentJson) } catch (e: Exception) { PersistentUiState() }
             } else {
-                PersistantUiState()
+                PersistentUiState()
             }
             
             val updated = update(current)

@@ -27,11 +27,11 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     // --- 2. PERSISTENT STATE (Disk storage) ---
-    val persistantUiState: StateFlow<PersistantUiState> = dataStoreManager.persistantUiState
+    val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PersistantUiState()
+            initialValue = PersistentUiState()
         )
 
     // --- 3. DATA POLLING ---

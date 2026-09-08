@@ -43,15 +43,15 @@ val AppScreenConfigs = listOf(
         screen = Screen.Speedometer,
         titleRes = R.string.title_speedometer,
         label = R.string.tab_speedometer,
-        activeIcon = Icons.Filled.Speed,
-        inactiveIcon = Icons.Outlined.Speed
+        activeIcon = Icons.Filled.Dashboard,
+        inactiveIcon = Icons.Outlined.Dashboard
     ),
     ScreenConfig(
         screen = Screen.Graph,
         titleRes = R.string.title_graph,
         label = R.string.tab_graph,
-        activeIcon = Icons.Filled.ShowChart,
-        inactiveIcon = Icons.Outlined.ShowChart
+        activeIcon = Icons.Filled.Assessment,
+        inactiveIcon = Icons.Outlined.Assessment
     )
 )
 

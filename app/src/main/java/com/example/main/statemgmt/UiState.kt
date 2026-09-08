@@ -32,6 +32,6 @@ data class UiState(
  * 2. PERSISTENT UI STATE (Saved to Disk)
  */
 @Serializable
-data class PersistantUiState(
+data class PersistentUiState(
     val lastUsedTimestamp: Long = 0L
 )
