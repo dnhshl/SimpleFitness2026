@@ -3,8 +3,7 @@ package com.example.main.ui.screens
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +39,7 @@ import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 @Composable
 fun GraphScreen(viewModel: AppViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val graphData by viewModel.activeGraphData.collectAsState()
     val modelProducer = remember { CartesianChartModelProducer() }
     
     // LEARNING POINT: Vico Axis Customization
@@ -62,41 +62,38 @@ fun GraphScreen(viewModel: AppViewModel) {
         minWidth = TextComponent.MinWidth.fixed(32.dp)
     )
 
-    // ... (rest of LaunchedEffect/DisposableEffect/xAxisValueFormatter stays same)
-    LaunchedEffect(Unit) {
-        viewModel.startPolling(intervalMs = 2000)
-    }
-    
-    // Ensure polling stops when screen is left
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.stopPolling()
-        }
-    }
+    // Polling is now managed globally by the Master Switch on the Home Screen.
+    // No more screen-specific start/stop logic here.
 
-    // Update the chart whenever history changes
-    LaunchedEffect(uiState.fitnessHistory) {
-        if (uiState.fitnessHistory.isNotEmpty()) {
+    // Update the chart whenever active data changes
+    LaunchedEffect(graphData) {
+        if (graphData.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    series(uiState.fitnessHistory.map { it.puls })
+                    // LEARNING POINT: Real-Time X-Axis
+                    // Instead of using indices (0, 1, 2...), we use epoch seconds as X values.
+                    // This means a 10-second gap looks twice as wide as a 5-second gap.
+                    series(
+                        x = graphData.map { TimeHelper.isoToEpochSeconds(it.isotimestamp) },
+                        y = graphData.map { it.puls }
+                    )
                 }
             }
         }
     }
 
-    // d) Formatter for the X-Axis to show the time from the ISO timestamp
+    // d) Formatter for the X-Axis to show the time from the epoch seconds
     val xAxisValueFormatter = CartesianValueFormatter { _, value, _ ->
-        uiState.fitnessHistory.getOrNull(value.toInt())?.let {
-            TimeHelper.formatToTimeOnly(it.isotimestamp)
-        } ?: ""
+        TimeHelper.formatEpochToTime(value)
     }
 
-    // Configure scroll state to automatically scroll to the end on new data
+    // LEARNING POINT: Dynamic Scrolling
+    // When in "Live" mode, we want the graph to follow the latest data (AutoScroll).
+    // When in "Database" mode, we disable auto-scroll so the user can inspect history.
     val scrollState = rememberVicoScrollState(
         initialScroll = Scroll.Absolute.End,
-        autoScroll = Scroll.Absolute.End,
-        autoScrollCondition = AutoScrollCondition.OnModelGrowth
+        autoScroll = if (uiState.showLiveGraph) Scroll.Absolute.End else Scroll.Absolute.Start,
+        autoScrollCondition = if (uiState.showLiveGraph) AutoScrollCondition.OnModelGrowth else AutoScrollCondition.Never
     )
 
     Column(
@@ -105,9 +102,26 @@ fun GraphScreen(viewModel: AppViewModel) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (uiState.fitnessHistory.isEmpty()) {
+        // --- DATA SOURCE SELECTOR ---
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (uiState.showLiveGraph) "LIVE DATA (Memory)" else "HISTORIC DATA (Database)",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (uiState.showLiveGraph) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+            )
+            Switch(
+                checked = uiState.showLiveGraph,
+                onCheckedChange = { viewModel.setGraphSource(it) }
+            )
+        }
+
+        if (graphData.isEmpty()) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("Waiting for data...")
+                Text(if (uiState.showLiveGraph) "Waiting for live data..." else "No historic data found.")
             }
         } else {
             CartesianChartHost(

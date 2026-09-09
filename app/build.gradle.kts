@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    alias(libs.plugins.ksp)
 }
 
 configure<ApplicationExtension> {
@@ -11,7 +12,7 @@ configure<ApplicationExtension> {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.simplefitness26"
+        applicationId = "com.example.simplefitnesssql"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
@@ -75,4 +76,9 @@ dependencies {
     // Vico Graphing Library
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
+
+    // Room Database
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 }

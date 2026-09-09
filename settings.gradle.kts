@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SimpleFitness26"
+rootProject.name = "SimpleFitnessSQL"
 include(":app")
  

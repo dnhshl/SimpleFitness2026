@@ -8,6 +8,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -46,8 +47,8 @@ object TimeHelper {
             val zonedDateTime = ZonedDateTime.parse(isoString)
                 .withZoneSameInstant(ZoneId.systemDefault())
             
-            // 2. Define how you want the date to look
-            val formatter = DateTimeFormatter.ofPattern("dd. MMMM yyyy, HH:mm", Locale.getDefault())
+            // 2. Define how you want the date to look (now including seconds)
+            val formatter = DateTimeFormatter.ofPattern("dd. MMMM yyyy, HH:mm:ss", Locale.getDefault())
             
             // 3. Return the formatted string
             zonedDateTime.format(formatter)
@@ -68,6 +69,32 @@ object TimeHelper {
             zonedDateTime.format(formatter)
         } catch (e: Exception) {
             "--:--:--"
+        }
+    }
+
+    /**
+     * Converts an ISO 8601 string to epoch seconds.
+     * Used for the X-axis values in the graph to represent real time intervals.
+     */
+    fun isoToEpochSeconds(isoString: String): Double {
+        return try {
+            ZonedDateTime.parse(isoString).toEpochSecond().toDouble()
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    /**
+     * Formats epoch seconds back to a readable time string (HH:mm:ss).
+     */
+    fun formatEpochToTime(epochSeconds: Double): String {
+        return try {
+            val zonedDateTime = Instant.ofEpochSecond(epochSeconds.toLong())
+                .atZone(ZoneId.systemDefault())
+            val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+            zonedDateTime.format(formatter)
+        } catch (e: Exception) {
+            ""
         }
     }
 }

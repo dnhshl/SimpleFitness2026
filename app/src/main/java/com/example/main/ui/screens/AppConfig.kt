@@ -17,6 +17,7 @@ sealed interface Screen : NavKey {
     @Serializable data object Home : Screen
     @Serializable data object Speedometer : Screen
     @Serializable data object Graph : Screen
+    @Serializable data object History : Screen
 }
 
 /**
@@ -52,6 +53,13 @@ val AppScreenConfigs = listOf(
         label = R.string.tab_graph,
         activeIcon = Icons.Filled.Assessment,
         inactiveIcon = Icons.Outlined.Assessment
+    ),
+    ScreenConfig(
+        screen = Screen.History,
+        titleRes = R.string.title_history,
+        label = R.string.tab_history,
+        activeIcon = Icons.Filled.History,
+        inactiveIcon = Icons.Outlined.History
     )
 )
 

@@ -25,7 +25,13 @@ data class UiState(
 
     val rawResponse: String = "",
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+
+    // NEW: Filtering and View Settings
+    val minBpmFilter: Int = 0,
+    val timeFilterMinutes: Int = 0,
+    val showLiveGraph: Boolean = true,
+    val isPollingEnabled: Boolean = true
 )
 
 /**

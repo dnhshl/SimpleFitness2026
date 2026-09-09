@@ -36,15 +36,8 @@ fun SpeedometerScreen(viewModel: AppViewModel) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
-    LaunchedEffect(Unit) {
-        viewModel.startPolling(intervalMs = 1000)
-    }
-    
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.stopPolling()
-        }
-    }
+    // Polling is now managed globally by the Master Switch on the Home Screen.
+    // No more screen-specific start/stop logic here.
 
     if (isLandscape) {
         SpeedometerLandscape(puls)

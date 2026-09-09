@@ -1,60 +1,82 @@
-# 🏃 SimpleFitness Educational App
+# 🏃 SimpleFitnessSQL Educational App
 
-Welcome to the latest version of the **SimpleFitness** project! 
+Welcome to **SimpleFitnessSQL**! 
 
-While the initial version of **SimpleFitness** (from last term) was built upon your experience with the **SimpleSensor** app, this updated version takes that foundation and adds professional architectural concepts: **Adaptive UI** and **Advanced Visualization**.
-
-## 🎓 Learning Module: Configuration & Adaptivity
-This version introduces a "Configuration-First" approach. Instead of hard-coding buttons and bars, we define the app structure in one place (`AppConfig.kt`), and the UI adapts automatically.
-
-### 📱 1. Adaptive Navigation (The "Rail" Pattern)
-Mobile apps must work in both **Portrait** and **Landscape**. 
-*   **Portrait**: The app uses a standard `NavigationBar` (Bottom Bar).
-*   **Landscape**: To save vertical space for the graph, the app automatically switches to a `NavigationRail` (Side Bar) and hides the `TopAppBar`.
-*   **The Magic**: Both components are driven by the same list of screens in `AppConfig.kt`.
-
-### 📊 2. Graph Customization (Vico Library)
-We've moved beyond "default" charts to a professional, readable implementation:
-*   **Axis Control**: We use `ItemPlacer` to control how often labels appear.
-*   **Stability**: We fixed the "flicker" by giving the Y-axis a fixed width. This is a common requirement in live-data dashboards.
+This learning session focuses purely on **Local Persistence (Room DB)**. It builds directly upon our previous work where we introduced **Adaptive UI** (orientation support) and **Advanced Visualization** (real-time time-series graphs).
 
 ---
 
-## 🏗️ Architecture Reminder
-We strictly follow the 3-layer architecture:
-1.  **Repository**: `HttpRepository.kt` manages the **Ktor** connection.
-2.  **ViewModel**: `AppViewModel.kt` handles data polling and the navigation state.
-3.  **UI**: `ui/screens/` displays the data. The entry point is `MainActivity.kt`.
+## 🏗️ Building on Previous Concepts
+To get the most out of this session, remember how we previously handled:
+*   **Adaptive Navigation**: The app automatically swaps between a `NavigationBar` (Portrait) and a `NavigationRail` (Landscape) using a "Configuration-First" approach in `AppConfig.kt`.
+*   **Advanced Visualization**: The `GraphScreen.kt` uses a real-time X-axis where spacing reflects actual time intervals between measurements.
+
+---
+
+## 💾 NEW: Learning Module: Local Persistence (RoomDB)
+In this version, we solve the problem of data loss. By adding **RoomDB**, the app now has a "Digital Memory."
+
+### 🏗️ The Architecture of Memory
+1.  **Entity**: `FitnessEntity.kt` defines the table structure (Timestamp, BPM, Fitness).
+2.  **DAO**: `FitnessDao.kt` contains the SQL logic (Store, Retrieve, Filter).
+3.  **Local Repository**: `LocalFitnessRepository.kt` manages the database operations.
+4.  **Master Polling Switch**: Located on the **Home Screen**, this is the "Engine Start" button. It controls network polling globally for the entire app.
+5.  **Reactive Switching**: The `GraphScreen.kt` now has a switch to toggle between **Live Data** (last 100 points in RAM) and **Historic Data** (everything saved in the DB).
+
+---
+
+## 🎓 The Re-Engineering Lab: Trace the Data Flow
+To truly understand how this professional-grade app works, you must "trace" the path of data from the internet all the way to the local database and the screen.
+
+### 1. Data Ingress (The Start)
+*   **File**: `repositories/HttpRepository.kt`
+*   **Explore**: See how **Ktor** handles the network request and how `kotlinx-serialization` turns a raw JSON string into a structured `FitnessData` object.
+
+### 2. The Engine (Master Control)
+*   **File**: `statemgmt/AppViewModel.kt` -> Look at `setPollingEnabled(...)` and `startPollingInternal()`.
+*   **Explore**: Notice how we use a single `Job` to manage the background loop. This job only runs when the "Live Streaming" switch on the Home Screen is ON.
+
+### 3. The Persistence "Pipe" (Saving)
+*   **File**: `statemgmt/AppViewModel.kt` -> Look inside the `performHttpRequest()` function.
+*   **Explore**: Notice the call to `localRepository.saveReading(...)`. Every cloud reading is automatically piped into the "Digital Memory."
+
+### 4. The Reactive Loop (The Magic)
+This is the core of modern Android. We use the **Single Source of Truth (SSOT)** pattern.
+*   **The Brain**: `AppViewModel.kt` defines `fitnessHistoryLog`. It uses `flatMapLatest` to automatically refresh your training log whenever the filters or the polling state change.
+*   **The UI**: `HistoryScreen.kt` collects this flow. It doesn't know about the network; it only knows about the database.
+
+### 5. Adaptive Scrolling
+*   **File**: `ui/screens/GraphScreen.kt` -> Look at the `scrollState` definition.
+*   **Explore**: See how the graph decides to "Auto-Scroll" only when in Live mode. In History mode, auto-scroll is disabled so you can manually inspect the log.
 
 ---
 
 ## 🛠️ Student Tasks
 
-### Task 1: The "Automatic" UI (Configuration)
-Your "Control Center" is `AppConfig.kt`. 
-1.  **Modify**: Change the icons for the `Home` or `Graph` screens in `AppScreenConfigs`.
-2.  **Verify**: Run the app and rotate your phone. Notice how your new icons appear in both the Bottom Bar AND the Side Rail automatically.
+### Task 1: Analyze the "Digital Memory"
+Open `AppViewModel.kt` and find the `activeGraphData` flow.
+1.  **Identify**: How does the app decide which list of data to send to the graph when you flip the switch?
+2.  **Logic**: Why do we use `.reversed()` when loading data from the database for the graph? (Hint: Look at the `ORDER BY` in `FitnessDao.kt`).
 
-### Task 2: Adding a New Feature
-Suppose you want to add a "Settings" tab.
-1.  **Action**: Add a new `ScreenConfig` object to the list in `AppConfig.kt`. Give it a title and an icon.
-2.  **Result**: Without touching any layout code, your new tab should appear in the navigation. (Note: Clicking it will show an error until you also add it to the `when` block in `MainActivity.kt`).
+### Task 2: Advanced Filtering (The Sports Engineer's Task)
+Currently, the History tab allows filtering by **Time** AND **Heart Rate**. Your task is to add a third filter: **Fitness Score**.
+1.  **DAO**: Update `getFilteredLogs` in `FitnessDao.kt` to include a minimum fitness score check (e.g., `AND fitnessScore >= :minFitness`).
+2.  **ViewModel**: Update the `uiState` to include `minFitnessFilter` and integrate it into the `flatMapLatest` logic.
+3.  **UI**: Add another `Slider` to `HistoryScreen.kt` for the Fitness Score.
 
-### Task 3: Graph Precision
-In `GraphScreen.kt`, the Y-axis shows a label every 20 BPM.
-1.  **Modify**: Find the `VerticalAxis.ItemPlacer.step` and change it to show a label every **10 BPM**.
-2.  **Analyze**: Look at the `size = BaseAxis.Size.Fixed(72.dp)` line. Why is this fixed size important when the heart rate changes from 99 to 100?
+### Task 3: The "Sports Data Science" Mini-Project
+1.  **Analysis**: Can you calculate the **Average Heart Rate** of all stored sessions and display it at the top of the History tab? (Hint: Use Kotlin's `.map { it.heartRate }.average()` on the history list).
+2.  **UI**: Add a "Clear All" button in the `HistoryScreen.kt` header that calls `viewModel.clearHistory()`.
 
 ---
 
 ## 📚 Helpful Resources
+*   **Room Database**: [Official Android Guide](https://developer.android.com/training/data-storage/room)
 *   **Vico Documentation**: [Axis customization](https://guide.vico.patrykandpatrick.com/core/axis/)
-*   **Material 3**: [Adaptive layouts with Navigation Rail](https://m3.material.io/components/navigation-rail/overview)
 
 ---
 
 ## 📁 Project Quick-Link
-*   **The Config**: `AppConfig.kt` -> Start here!
-*   **The Brain**: `AppViewModel.kt`.
-*   **The Layout**: `MainActivity.kt` -> See how it handles rotation.
-*   **The Screens**: `GraphScreen.kt`, `HomeScreen.kt`, `SpeedometerScreen.kt`.
+*   **The DB**: `db/` folder -> Entity, DAO, and Database definition.
+*   **The Logic**: `AppViewModel.kt` -> Orchestrates Web, DB, and Navigation.
+*   **The Config**: `AppConfig.kt` -> The central configuration for the adaptive UI.

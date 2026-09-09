@@ -137,6 +137,7 @@ fun MainAppScreen(viewModel: AppViewModel) {
                             is Screen.Home -> HomeScreen(viewModel)
                             is Screen.Speedometer -> SpeedometerScreen(viewModel)
                             is Screen.Graph -> GraphScreen(viewModel)
+                            is Screen.History -> HistoryScreen(viewModel)
                         }
                     }
                 }

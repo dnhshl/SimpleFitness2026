@@ -1,15 +1,17 @@
 <resources>
-    <string name="app_name">HTTP Data Viewer</string>
+    <string name="app_name">Simple Fitness SQL</string>
 
     <!-- Navigation Tabs -->
     <string name="tab_home">Home</string>
     <string name="tab_speedometer">Speed</string>
     <string name="tab_graph">Graph</string>
+    <string name="tab_history">History</string>
 
     <!-- Top Bar Titles -->
     <string name="title_home">Data Fetcher</string>
     <string name="title_speedometer">Speedometer</string>
     <string name="title_graph">Data Graph</string>
+    <string name="title_history">Training Log</string>
 
     <!-- Home Screen -->
     <string name="btn_fetch_data">Fetch JSON Data</string>

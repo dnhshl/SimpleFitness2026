@@ -99,10 +99,44 @@ fun HomeControls(viewModel: AppViewModel, uiState: UiState) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Trigger Button
+        // LEARNING POINT: Master Data Switch
+        // Instead of automatic polling, we allow the user to explicitly 
+        // enable "Live Mode" for the whole app.
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (uiState.isPollingEnabled) 
+                    MaterialTheme.colorScheme.primaryContainer 
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (uiState.isPollingEnabled) "Live Streaming: ON" else "Live Streaming: OFF",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Enable to auto-update Speed and Graph screens.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    checked = uiState.isPollingEnabled,
+                    onCheckedChange = { viewModel.setPollingEnabled(it) }
+                )
+            }
+        }
+
+        // 1. Trigger Button (Manual Fetch)
         Button(
             onClick = { viewModel.performHttpRequest() },
-            enabled = !uiState.isLoading,
+            // If live polling is already ON, we disable the manual button
+            enabled = !uiState.isLoading && !uiState.isPollingEnabled,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(stringResource(R.string.btn_fetch_data))
