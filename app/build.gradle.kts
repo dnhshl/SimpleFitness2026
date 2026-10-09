@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 configure<ApplicationExtension> {
@@ -12,7 +13,7 @@ configure<ApplicationExtension> {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.simplefitnesssql"
+        applicationId = "com.example.simplefitnessfirebase"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
@@ -81,4 +82,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // Firebase Authentication
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
 }

@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.main.db.AppDatabase
 import com.example.main.repositories.HttpRepository
+import com.example.main.repositories.FirebaseAuthRepository
 import com.example.main.repositories.LocalFitnessRepository
 import com.example.main.ui.screens.Screen
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,6 +28,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     private val dataStoreManager = DataStoreManager(application)
     private val httpRepository = HttpRepository(application)
+    private val authRepository = FirebaseAuthRepository()
     
     // LEARNING POINT: Database Initialization
     private val database = AppDatabase.getDatabase(application)
@@ -35,6 +37,105 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     // --- 1. UI STATE (Memory only) ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        _uiState.update { 
+            it.copy(
+                currentUserEmail = authRepository.currentUser?.email,
+                currentUserNickname = authRepository.currentUser?.displayName
+            )
+        }
+        if (_uiState.value.isPollingEnabled) {
+            startPollingInternal()
+        }
+    }
+
+    fun signIn(email: String, pass: String) {
+        if (email.isBlank() || pass.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = authRepository.signIn(email, pass)
+            result.fold(
+                onSuccess = { user ->
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false, 
+                            currentUserEmail = user?.email, 
+                            currentUserNickname = user?.displayName, 
+                            errorMessage = null
+                        ) 
+                    }
+                    navigateTo(Screen.Home)
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
+                }
+            )
+        }
+    }
+
+    fun signUp(email: String, pass: String) {
+        if (email.isBlank() || pass.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = authRepository.signUp(email, pass)
+            result.fold(
+                onSuccess = { user ->
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false, 
+                            currentUserEmail = user?.email, 
+                            currentUserNickname = user?.displayName, 
+                            errorMessage = null
+                        ) 
+                    }
+                    navigateTo(Screen.Home)
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
+                }
+            )
+        }
+    }
+
+    fun signOut() {
+        authRepository.signOut()
+        _uiState.update { it.copy(currentUserEmail = null, currentUserNickname = null) }
+        navigateTo(Screen.Home)
+    }
+
+    fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
+        if (email.isBlank()) {
+            onResult(false, "Please enter your email address first.")
+            return
+        }
+        viewModelScope.launch {
+            val result = authRepository.sendPasswordReset(email)
+            result.fold(
+                onSuccess = { onResult(true, "Password reset email sent successfully.") },
+                onFailure = { error -> onResult(false, error.localizedMessage) }
+            )
+        }
+    }
+
+    fun setNickname(newNickname: String) {
+        viewModelScope.launch {
+            if (authRepository.currentUser != null) {
+                val result = authRepository.updateNickname(newNickname)
+                if (result.isSuccess) {
+                    _uiState.update { it.copy(currentUserNickname = newNickname) }
+                }
+            } else {
+                dataStoreManager.updatePersistentState { it.copy(nickname = newNickname) }
+            }
+        }
+    }
 
     // --- 2. PERSISTENT STATE (Disk storage) ---
     val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
