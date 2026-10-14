@@ -9,7 +9,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -84,7 +83,6 @@ fun MainAppScreen(viewModel: AppViewModel) {
             topBar = {
                 // We hide the TopBar in landscape to save space for the content.
                 if (!isLandscape) {
-                    val uiState by viewModel.uiState.collectAsState()
                     TopAppBar(
                         title = { Text(stringResource(currentScreen.titleRes)) },
                         navigationIcon = {
@@ -94,60 +92,6 @@ fun MainAppScreen(viewModel: AppViewModel) {
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = stringResource(R.string.back_description)
                                     )
-                                }
-                            }
-                        },
-                        actions = {
-                            if (currentScreen != Screen.Login) {
-                                var menuExpanded by remember { mutableStateOf(false) }
-                                Box {
-                                    IconButton(onClick = { menuExpanded = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccountCircle,
-                                            contentDescription = "Account Menu"
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = menuExpanded,
-                                        onDismissRequest = { menuExpanded = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Column {
-                                                    if (!uiState.currentUserNickname.isNullOrEmpty()) {
-                                                        Text("Name: ${uiState.currentUserNickname}", style = MaterialTheme.typography.bodyMedium)
-                                                    }
-                                                    Text(
-                                                        if (!uiState.currentUserEmail.isNullOrEmpty()) 
-                                                            "User: ${uiState.currentUserEmail}" 
-                                                        else 
-                                                            "Mode: Guest",
-                                                        style = MaterialTheme.typography.bodySmall
-                                                    )
-                                                }
-                                            },
-                                            onClick = { },
-                                            enabled = false
-                                        )
-                                        HorizontalDivider()
-                                        if (!uiState.currentUserEmail.isNullOrEmpty()) {
-                                            DropdownMenuItem(
-                                                text = { Text("Logout") },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    viewModel.signOut()
-                                                }
-                                            )
-                                        } else {
-                                            DropdownMenuItem(
-                                                text = { Text("Login / Register") },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    viewModel.navigateTo(Screen.Login)
-                                                }
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         },
@@ -194,7 +138,6 @@ fun MainAppScreen(viewModel: AppViewModel) {
                             is Screen.Speedometer -> SpeedometerScreen(viewModel)
                             is Screen.Graph -> GraphScreen(viewModel)
                             is Screen.History -> HistoryScreen(viewModel)
-                            is Screen.Login -> LoginScreen(viewModel)
                         }
                     }
                 }

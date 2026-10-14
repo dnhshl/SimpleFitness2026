@@ -6,26 +6,21 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * LEARNING POINT: Repository Pattern
- * This class abstracts the data source (Room DB) from the rest of the app.
- * The ViewModel doesn't need to know about SQL or DAOs.
+ * Abstracts the Room DB data source, supporting session-based queries.
  */
 class LocalFitnessRepository(private val fitnessDao: FitnessDao) {
 
-    // Expose data as a stream
-    val allLogs: Flow<List<FitnessEntity>> = fitnessDao.getAllLogs()
+    val allSessions: Flow<List<String>> = fitnessDao.getAllSessions()
 
-    // Save a single reading
-    suspend fun saveReading(timestamp: String, bpm: Int, fitness: Double) {
-        val entity = FitnessEntity(timestamp, bpm, fitness)
+    suspend fun saveReading(timestamp: String, bpm: Int, fitness: Double, sessionId: String) {
+        val entity = FitnessEntity(timestamp, sessionId, bpm, fitness)
         fitnessDao.insert(entity)
     }
 
-    // Filter logic: Heart rate and Time
-    fun getFilteredData(minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>> {
-        return fitnessDao.getFilteredLogs(minBpm, minTimestamp)
+    fun getFilteredDataBySession(sessionId: String, minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>> {
+        return fitnessDao.getFilteredLogsBySession(sessionId, minBpm, minTimestamp)
     }
 
-    // Clear everything
     suspend fun clearHistory() {
         fitnessDao.deleteAll()
     }

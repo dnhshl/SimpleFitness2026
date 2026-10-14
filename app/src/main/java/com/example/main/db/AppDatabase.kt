@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
  * LEARNING POINT: Room Database
  * The main access point to the local database.
  */
-@Database(entities = [FitnessEntity::class], version = 1, exportSchema = false)
+@Database(entities = [FitnessEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     
     abstract fun fitnessDao(): FitnessDao
@@ -24,7 +24,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "fitness_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration(true)
+                    .build()
                 INSTANCE = instance
                 instance
             }

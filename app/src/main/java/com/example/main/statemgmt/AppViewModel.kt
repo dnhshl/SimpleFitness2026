@@ -7,7 +7,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.main.db.AppDatabase
 import com.example.main.repositories.HttpRepository
-import com.example.main.repositories.FirebaseAuthRepository
 import com.example.main.repositories.LocalFitnessRepository
 import com.example.main.ui.screens.Screen
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,113 +27,34 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     private val dataStoreManager = DataStoreManager(application)
     private val httpRepository = HttpRepository(application)
-    private val authRepository = FirebaseAuthRepository()
     
     // LEARNING POINT: Database Initialization
     private val database = AppDatabase.getDatabase(application)
     private val localRepository = LocalFitnessRepository(database.fitnessDao())
+
+    // --- SESSION ID FOR ROOM DB FILTERING ---
+    var currentSessionId: String = generateNewSessionId()
+        private set
+
+    private fun generateNewSessionId(): String {
+        return "Session " + DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss").format(OffsetDateTime.now())
+    }
+
+    val availableSessions: StateFlow<List<String>> = localRepository.allSessions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- 1. UI STATE (Memory only) ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
-        _uiState.update { 
-            it.copy(
-                currentUserEmail = authRepository.currentUser?.email,
-                currentUserNickname = authRepository.currentUser?.displayName
-            )
-        }
         if (_uiState.value.isPollingEnabled) {
             startPollingInternal()
         }
     }
 
-    fun signIn(email: String, pass: String) {
-        if (email.isBlank() || pass.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = authRepository.signIn(email, pass)
-            result.fold(
-                onSuccess = { user ->
-                    _uiState.update { 
-                        it.copy(
-                            isLoading = false, 
-                            currentUserEmail = user?.email, 
-                            currentUserNickname = user?.displayName, 
-                            errorMessage = null
-                        ) 
-                    }
-                    navigateTo(Screen.Home)
-                },
-                onFailure = { error ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
-                }
-            )
-        }
-    }
-
-    fun signUp(email: String, pass: String) {
-        if (email.isBlank() || pass.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = authRepository.signUp(email, pass)
-            result.fold(
-                onSuccess = { user ->
-                    _uiState.update { 
-                        it.copy(
-                            isLoading = false, 
-                            currentUserEmail = user?.email, 
-                            currentUserNickname = user?.displayName, 
-                            errorMessage = null
-                        ) 
-                    }
-                    navigateTo(Screen.Home)
-                },
-                onFailure = { error ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
-                }
-            )
-        }
-    }
-
-    fun signOut() {
-        authRepository.signOut()
-        _uiState.update { it.copy(currentUserEmail = null, currentUserNickname = null) }
-        navigateTo(Screen.Home)
-    }
-
-    fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
-        if (email.isBlank()) {
-            onResult(false, "Please enter your email address first.")
-            return
-        }
-        viewModelScope.launch {
-            val result = authRepository.sendPasswordReset(email)
-            result.fold(
-                onSuccess = { onResult(true, "Password reset email sent successfully.") },
-                onFailure = { error -> onResult(false, error.localizedMessage) }
-            )
-        }
-    }
-
-    fun setNickname(newNickname: String) {
-        viewModelScope.launch {
-            if (authRepository.currentUser != null) {
-                val result = authRepository.updateNickname(newNickname)
-                if (result.isSuccess) {
-                    _uiState.update { it.copy(currentUserNickname = newNickname) }
-                }
-            } else {
-                dataStoreManager.updatePersistentState { it.copy(nickname = newNickname) }
-            }
-        }
+    fun setSelectedSessionId(sessionId: String?) {
+        _uiState.update { it.copy(selectedSessionId = sessionId) }
     }
 
     // --- 2. PERSISTENT STATE (Disk storage) ---
@@ -147,11 +67,22 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     // --- 3. DATABASE FILTERING & TRANSFORMATIONS ---
     
+    /**
+     * LEARNING POINT: Reaktive Datenverarbeitung & Flow-Kombination
+     * 
+     * `fitnessHistoryLog` beobachtet den UI-Zustand (Filter wie Puls, Zeit und SessionID) 
+     * und lädt Daten automatisch reaktiv aus der Room Database.
+     * 
+     * 1. map: Extrahiert die relevanten Filterkriterien als Tripel.
+     * 2. distinctUntilChanged: Verhindert unnötige DB-Abfragen, wenn sich die Filter nicht geändert haben.
+     * 3. flatMapLatest: Bricht bei einer Filteränderung die alte DB-Abfrage ab und startet sofort die neue.
+     * 4. stateIn: Wandelt den Flow in einen Hot StateFlow um, den die UI beobachten kann.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val fitnessHistoryLog = uiState
-        .map { it.minBpmFilter to it.timeFilterMinutes }
+        .map { Triple(it.minBpmFilter, it.timeFilterMinutes, it.selectedSessionId) }
         .distinctUntilChanged()
-        .flatMapLatest { (bpm, mins) ->
+        .flatMapLatest { (bpm, mins, sessionId) ->
             val timestamp = if (mins > 0) {
                 OffsetDateTime.now(ZoneOffset.UTC)
                     .minusMinutes(mins.toLong())
@@ -159,9 +90,17 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             } else {
                 "" 
             }
-            localRepository.getFilteredData(bpm, timestamp)
+            val activeSession = if (sessionId.isNullOrBlank()) currentSessionId else sessionId
+            localRepository.getFilteredDataBySession(activeSession, bpm, timestamp)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * LEARNING POINT: Datenquellen-Umschaltung (Live vs. Historisch)
+     * 
+     * `activeGraphData` entscheidet reaktiv, welche Daten an den Graphen (`GraphScreen`) übergeben werden:
+     * - Im Live-Modus (`showLiveGraph = true`): Die flüchtigen Live-Daten aus dem Arbeitsspeicher (`uiState.fitnessHistory`).
+     * - Im historischen Modus (`showLiveGraph = false`): Die aus der Room-Datenbank gefilterten und konvertierten Datensätze.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val activeGraphData = uiState
         .map { it.showLiveGraph }
@@ -186,10 +125,13 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     
     /**
      * Master Switch: Toggles the background data collection.
+     * Erzeugt jedes Mal eine neue SessionID, wenn Live-Streaming eingeschaltet wird.
      */
     fun setPollingEnabled(enabled: Boolean) { 
         _uiState.update { it.copy(isPollingEnabled = enabled) } 
         if (enabled) {
+            currentSessionId = generateNewSessionId()
+            setSelectedSessionId(currentSessionId)
             startPollingInternal()
         } else {
             stopPollingInternal()
@@ -238,11 +180,12 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                     )
                 }
 
-                // Automatic Persistence
+                // Automatic Persistence with Session ID
                 localRepository.saveReading(
                     timestamp = data.isotimestamp,
                     bpm = data.puls,
-                    fitness = data.fitness
+                    fitness = data.fitness,
+                    sessionId = currentSessionId
                 )
             } catch (e: Exception) {
                 _uiState.update { it.copy(

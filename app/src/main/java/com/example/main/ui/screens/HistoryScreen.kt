@@ -15,19 +15,59 @@ import com.example.main.statemgmt.AppViewModel
 import com.example.main.statemgmt.TimeHelper
 
 /**
- * LEARNING POINT: The Training History with Filtering
- * This screen demonstrates how to read and filter data from the Room database.
+ * LEARNING POINT: The Training History with Filtering & Session Management
+ * This screen demonstrates how to filter Room database records by SessionID and parameters.
  */
 @Composable
 fun HistoryScreen(viewModel: AppViewModel) {
-    // 1. Observe the data and the central UI State from the ViewModel
     val uiState by viewModel.uiState.collectAsState()
     val history by viewModel.fitnessHistoryLog.collectAsState()
+    val sessions by viewModel.availableSessions.collectAsState()
+    val currentSelectedSession = uiState.selectedSessionId ?: viewModel.currentSessionId
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // --- SESSION SELECTOR SECTION ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = "Training Session", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                var expanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    ) {
+                        Text(text = currentSelectedSession)
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        val allSessions = if (sessions.isEmpty()) listOf(viewModel.currentSessionId) else sessions
+                        allSessions.forEach { session ->
+                            DropdownMenuItem(
+                                text = { Text(session) },
+                                onClick = {
+                                    viewModel.setSelectedSessionId(session)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // --- FILTER UI SECTION ---
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -38,7 +78,7 @@ fun HistoryScreen(viewModel: AppViewModel) {
                 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // BPM Filter Slider (now reading from uiState)
+                // BPM Filter Slider
                 Text(text = "Min Heart Rate: ${uiState.minBpmFilter} BPM", style = MaterialTheme.typography.bodySmall)
                 Slider(
                     value = uiState.minBpmFilter.toFloat(),
@@ -47,7 +87,7 @@ fun HistoryScreen(viewModel: AppViewModel) {
                     steps = 20
                 )
 
-                // Time Filter Selection (now reading from uiState)
+                // Time Filter Selection
                 Text(text = "Show records from:", style = MaterialTheme.typography.bodySmall)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -79,7 +119,7 @@ fun HistoryScreen(viewModel: AppViewModel) {
 
         if (history.isEmpty()) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text("No data matches your filters.")
+                Text("No data matches your filters for this session.")
             }
         } else {
             LazyColumn(
@@ -125,7 +165,6 @@ fun HistoryItem(time: String, bpm: Int, fitness: Double) {
                 Text(text = time, style = MaterialTheme.typography.bodySmall)
                 Text(text = "Heart Rate: $bpm BPM", style = MaterialTheme.typography.bodyLarge)
             }
-            // LEARNING TASK: Students could add color coding here (e.g. red if high BPM)
             Text(
                 text = "%.1f".format(fitness),
                 style = MaterialTheme.typography.headlineSmall,

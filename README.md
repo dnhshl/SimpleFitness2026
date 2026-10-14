@@ -1,82 +1,58 @@
 # 🏃 SimpleFitnessSQL Educational App
 
-Welcome to **SimpleFitnessSQL**! 
+Willkommen zu **SimpleFitnessSQL**! 
 
-This learning session focuses purely on **Local Persistence (Room DB)**. It builds directly upon our previous work where we introduced **Adaptive UI** (orientation support) and **Advanced Visualization** (real-time time-series graphs).
+Diese Lerneinheit baut auf der bekannten **SimpleFitness**-App auf und konzentriert sich rein auf **Lokale Persistenz (Room DB)** sowie **Sitzungs-Verwaltung (Session Management)**. 
 
----
-
-## 🏗️ Building on Previous Concepts
-To get the most out of this session, remember how we previously handled:
-*   **Adaptive Navigation**: The app automatically swaps between a `NavigationBar` (Portrait) and a `NavigationRail` (Landscape) using a "Configuration-First" approach in `AppConfig.kt`.
-*   **Advanced Visualization**: The `GraphScreen.kt` uses a real-time X-axis where spacing reflects actual time intervals between measurements.
+Nachdem ihr in der Vorlesung die absoluten Grundlagen zur Room Database (SQL, Entities, DAOs) kennengelernt habt, erarbeitet ihr euch die konkrete Umsetzung in dieser App im **Reverse Engineering**.
 
 ---
 
-## 💾 NEW: Learning Module: Local Persistence (RoomDB)
-In this version, we solve the problem of data loss. By adding **RoomDB**, the app now has a "Digital Memory."
-
-### 🏗️ The Architecture of Memory
-1.  **Entity**: `FitnessEntity.kt` defines the table structure (Timestamp, BPM, Fitness).
-2.  **DAO**: `FitnessDao.kt` contains the SQL logic (Store, Retrieve, Filter).
-3.  **Local Repository**: `LocalFitnessRepository.kt` manages the database operations.
-4.  **Master Polling Switch**: Located on the **Home Screen**, this is the "Engine Start" button. It controls network polling globally for the entire app.
-5.  **Reactive Switching**: The `GraphScreen.kt` now has a switch to toggle between **Live Data** (last 100 points in RAM) and **Historic Data** (everything saved in the DB).
+## 🏗️ Architektur der App
+Die App folgt strikt einer sauberen, modularen Architektur:
+1. **Entity**: [`FitnessEntity.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/db/FitnessEntity.kt) definiert die Tabellenstruktur inkl. `sessionId`.
+2. **DAO**: [`FitnessDao.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/db/FitnessDao.kt`) enthält die SQL-Abfragen (inkl. `DISTINCT` für Sessions und `WHERE`-Filterung).
+3. **Repository**: [`LocalFitnessRepository.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/repositories/LocalFitnessRepository.kt`) kapselt die Datenbankoperationen.
+4. **ViewModel**: [`AppViewModel.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/statemgmt/AppViewModel.kt`) orchestriert Netzwerk-Pollling, Session-Generierung und reaktive Flows.
 
 ---
 
-## 🎓 The Re-Engineering Lab: Trace the Data Flow
-To truly understand how this professional-grade app works, you must "trace" the path of data from the internet all the way to the local database and the screen.
+## 🔍 Reverse Engineering Lab: Auf den Spuren der Daten
+Geht die folgenden Stationen im Code durch und versucht nachzuvollziehen, wie die Konzepte implementiert wurden:
 
-### 1. Data Ingress (The Start)
-*   **File**: `repositories/HttpRepository.kt`
-*   **Explore**: See how **Ktor** handles the network request and how `kotlinx-serialization` turns a raw JSON string into a structured `FitnessData` object.
+### 1. Die Digitale Erinnerung (Entity & DAO)
+* **Dateien**: [`FitnessEntity.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/db/FitnessEntity.kt`) & [`FitnessDao.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/db/FitnessDao.kt`)
+* **Aufgabe**: Schaut euch an, wie über `sessionId` Messungen von verschiedenen Trainingstagen getrennt werden. Warum verwenden wir in SQL `SELECT DISTINCT sessionId`?
 
-### 2. The Engine (Master Control)
-*   **File**: `statemgmt/AppViewModel.kt` -> Look at `setPollingEnabled(...)` and `startPollingInternal()`.
-*   **Explore**: Notice how we use a single `Job` to manage the background loop. This job only runs when the "Live Streaming" switch on the Home Screen is ON.
+### 2. Session Management & Polling
+* **Datei**: [`AppViewModel.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/statemgmt/AppViewModel.kt`) -> `setPollingEnabled(...)`
+* **Aufgabe**: Beobachtet, was passiert, wenn ihr den "Live Streaming"-Schalter auf dem Home-Screen einschaltet. Wie wird sichergestellt, dass jede Live-Sitzung eine neue `SessionID` erhält?
 
-### 3. The Persistence "Pipe" (Saving)
-*   **File**: `statemgmt/AppViewModel.kt` -> Look inside the `performHttpRequest()` function.
-*   **Explore**: Notice the call to `localRepository.saveReading(...)`. Every cloud reading is automatically piped into the "Digital Memory."
-
-### 4. The Reactive Loop (The Magic)
-This is the core of modern Android. We use the **Single Source of Truth (SSOT)** pattern.
-*   **The Brain**: `AppViewModel.kt` defines `fitnessHistoryLog`. It uses `flatMapLatest` to automatically refresh your training log whenever the filters or the polling state change.
-*   **The UI**: `HistoryScreen.kt` collects this flow. It doesn't know about the network; it only knows about the database.
-
-### 5. Adaptive Scrolling
-*   **File**: `ui/screens/GraphScreen.kt` -> Look at the `scrollState` definition.
-*   **Explore**: See how the graph decides to "Auto-Scroll" only when in Live mode. In History mode, auto-scroll is disabled so you can manually inspect the log.
+### 3. Reaktiver Datenfluss (Single Source of Truth)
+* **Datei**: [`AppViewModel.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/statemgmt/AppViewModel.kt`) -> `fitnessHistoryLog`
+* **Aufgabe**: Studiert die Kommentare zu `map`, `distinctUntilChanged` und `flatMapLatest`. Wie reagiert die App, wenn ihr im History-Screen die Session oder den Puls-Filter ändert?
 
 ---
 
-## 🛠️ Student Tasks
+## 🛠️ Aufgaben für Studierende
 
-### Task 1: Analyze the "Digital Memory"
-Open `AppViewModel.kt` and find the `activeGraphData` flow.
-1.  **Identify**: How does the app decide which list of data to send to the graph when you flip the switch?
-2.  **Logic**: Why do we use `.reversed()` when loading data from the database for the graph? (Hint: Look at the `ORDER BY` in `FitnessDao.kt`).
+### Aufgabe 1: Session-Filterung nachvollziehen
+1. Startet die App und lasst ein paar Live-Daten einlesen (wird als Session gespeichert).
+2. Schaltet das Live-Streaming aus, wartet kurz und schaltet es wieder ein (dadurch startet eine neue Session).
+3. Öffnet den **History-Screen** und den **Graph-Screen**: Überprüft das Session-Dropdown. Wie verhalten sich die Graphen und Tabellen beim Umschalten zwischen den Sessions?
 
-### Task 2: Advanced Filtering (The Sports Engineer's Task)
-Currently, the History tab allows filtering by **Time** AND **Heart Rate**. Your task is to add a third filter: **Fitness Score**.
-1.  **DAO**: Update `getFilteredLogs` in `FitnessDao.kt` to include a minimum fitness score check (e.g., `AND fitnessScore >= :minFitness`).
-2.  **ViewModel**: Update the `uiState` to include `minFitnessFilter` and integrate it into the `flatMapLatest` logic.
-3.  **UI**: Add another `Slider` to `HistoryScreen.kt` for the Fitness Score.
+### Aufgabe 2: Erweitertes Filtern (Fitness Score)
+Aktuell wird nach Puls und Zeit gefiltert. Eure Aufgabe ist es, einen dritten Filter hinzuzufügen: **Fitness Score**.
+1. **DAO**: Erweitert `getFilteredLogsBySession` in [`FitnessDao.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/db/FitnessDao.kt`) um eine Bedingung für den minimalen Fitness Score (`AND fitnessScore >= :minFitness`).
+2. **ViewModel**: Passt `UiState` und `fitnessHistoryLog` in [`AppViewModel.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/statemgmt/AppViewModel.kt`) an.
+3. **UI**: Fügt in [`HistoryScreen.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/ui/screens/HistoryScreen.kt`) einen weiteren Slider für den Fitness Score hinzu.
 
-### Task 3: The "Sports Data Science" Mini-Project
-1.  **Analysis**: Can you calculate the **Average Heart Rate** of all stored sessions and display it at the top of the History tab? (Hint: Use Kotlin's `.map { it.heartRate }.average()` on the history list).
-2.  **UI**: Add a "Clear All" button in the `HistoryScreen.kt` header that calls `viewModel.clearHistory()`.
-
----
-
-## 📚 Helpful Resources
-*   **Room Database**: [Official Android Guide](https://developer.android.com/training/data-storage/room)
-*   **Vico Documentation**: [Axis customization](https://guide.vico.patrykandpatrick.com/core/axis/)
+### Aufgabe 3: Statistik-Berechnung
+1. Berechnet im `HistoryScreen` den **Durchschnittspuls** aller angezeigten Messungen der aktiven Session und zeigt diesen als Kennzahl an.
+2. Fügt einen Button hinzu, um die Historie der aktuellen Session zu löschen.
 
 ---
 
-## 📁 Project Quick-Link
-*   **The DB**: `db/` folder -> Entity, DAO, and Database definition.
-*   **The Logic**: `AppViewModel.kt` -> Orchestrates Web, DB, and Navigation.
-*   **The Config**: `AppConfig.kt` -> The central configuration for the adaptive UI.
+## 📚 Hilfreiche Ressourcen
+*   **Room Database**: [Offizieller Android Guide](https://developer.android.com/training/data-storage/room)
+*   **Kotlin Flows**: [Asynchronous Flow Guide](https://kotlinlang.org/docs/flow.html)

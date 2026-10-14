@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SimpleFitnessFirebase"
+rootProject.name = "SimpleSQL"
 include(":app")
  

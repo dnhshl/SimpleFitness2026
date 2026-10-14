@@ -12,7 +12,6 @@
     <string name="title_speedometer">Speedometer</string>
     <string name="title_graph">Data Graph</string>
     <string name="title_history">Training Log</string>
-    <string name="title_login">Firebase Login</string>
 
     <!-- Home Screen -->
     <string name="btn_fetch_data">Fetch JSON Data</string>

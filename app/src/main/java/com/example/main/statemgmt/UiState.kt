@@ -31,9 +31,9 @@ data class UiState(
     val minBpmFilter: Int = 0,
     val timeFilterMinutes: Int = 0,
     val showLiveGraph: Boolean = true,
-    val isPollingEnabled: Boolean = true,
-    val currentUserEmail: String? = null,
-    val currentUserNickname: String? = null
+    val isPollingEnabled: Boolean = false,
+    val snackbarMessage: String? = null,
+    val selectedSessionId: String? = null
 )
 
 /**
@@ -41,6 +41,5 @@ data class UiState(
  */
 @Serializable
 data class PersistentUiState(
-    val lastUsedTimestamp: Long = 0L,
-    val nickname: String = ""
+    val lastUsedTimestamp: Long = 0L
 )

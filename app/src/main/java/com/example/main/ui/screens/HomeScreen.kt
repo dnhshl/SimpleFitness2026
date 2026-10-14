@@ -12,13 +12,11 @@ import com.example.main.statemgmt.AppViewModel
 
 /**
  * The Home Screen template.
- * Displays the Live Data streaming switch and user nickname configuration.
+ * Displays the Live Data streaming switch.
  */
 @Composable
 fun HomeScreen(viewModel: AppViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val persistentState by viewModel.persistentUiState.collectAsState()
-    var nicknameInput by remember(persistentState.nickname) { mutableStateOf(persistentState.nickname) }
 
     Column(
         modifier = Modifier
@@ -56,28 +54,6 @@ fun HomeScreen(viewModel: AppViewModel) {
                     checked = uiState.isPollingEnabled,
                     onCheckedChange = { viewModel.setPollingEnabled(it) }
                 )
-            }
-        }
-
-        // --- 2. NICKNAME CONFIGURATION CARD ---
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(text = "User Nickname", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = nicknameInput,
-                    onValueChange = { nicknameInput = it },
-                    label = { Text("Enter your nickname") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(
-                    onClick = { viewModel.setNickname(nicknameInput) },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Save Nickname")
-                }
             }
         }
     }

@@ -36,43 +36,35 @@ import com.patrykandpatrick.vico.compose.common.component.TextComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 
+/**
+ * LEARNING POINT: The Graph Screen with Session & Live Filtering
+ * Displays real-time or historic Vico charts filtered by session.
+ */
 @Composable
 fun GraphScreen(viewModel: AppViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val graphData by viewModel.activeGraphData.collectAsState()
+    val sessions by viewModel.availableSessions.collectAsState()
+    val currentSelectedSession = uiState.selectedSessionId ?: viewModel.currentSessionId
     val modelProducer = remember { CartesianChartModelProducer() }
     
-    // LEARNING POINT: Vico Axis Customization
-    // We define titles and labels for the axes using string resources.
     val labelTime = stringResource(R.string.label_axis_time)
     val labelBpm = stringResource(R.string.label_axis_heart_rate)
     
-    // We create a reusable 'TextComponent' for the titles.
-    // Notice the 'margins' - this prevents the title from overlapping the tick labels.
     val axisTitleComponent = rememberTextComponent(
         style = TextStyle(color = MaterialTheme.colorScheme.onSurface),
         margins = Insets(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
     )
     
-    // We also style the tick labels (the numbers).
-    // 'minWidth' is used here to prevent the axis from "jittering" (flicker)
-    // when values change between 2 and 3 digits.
     val axisLabelComponent = rememberAxisLabelComponent(
         style = TextStyle(color = MaterialTheme.colorScheme.onSurfaceVariant),
         minWidth = TextComponent.MinWidth.fixed(32.dp)
     )
 
-    // Polling is now managed globally by the Master Switch on the Home Screen.
-    // No more screen-specific start/stop logic here.
-
-    // Update the chart whenever active data changes
     LaunchedEffect(graphData) {
         if (graphData.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    // LEARNING POINT: Real-Time X-Axis
-                    // Instead of using indices (0, 1, 2...), we use epoch seconds as X values.
-                    // This means a 10-second gap looks twice as wide as a 5-second gap.
                     series(
                         x = graphData.map { TimeHelper.isoToEpochSeconds(it.isotimestamp) },
                         y = graphData.map { it.puls }
@@ -82,14 +74,10 @@ fun GraphScreen(viewModel: AppViewModel) {
         }
     }
 
-    // d) Formatter for the X-Axis to show the time from the epoch seconds
     val xAxisValueFormatter = CartesianValueFormatter { _, value, _ ->
         TimeHelper.formatEpochToTime(value)
     }
 
-    // LEARNING POINT: Dynamic Scrolling
-    // When in "Live" mode, we want the graph to follow the latest data (AutoScroll).
-    // When in "Database" mode, we disable auto-scroll so the user can inspect history.
     val scrollState = rememberVicoScrollState(
         initialScroll = Scroll.Absolute.End,
         autoScroll = if (uiState.showLiveGraph) Scroll.Absolute.End else Scroll.Absolute.Start,
@@ -119,9 +107,48 @@ fun GraphScreen(viewModel: AppViewModel) {
             )
         }
 
+        // --- SESSION SELECTOR (Historic Data mode only) ---
+        if (!uiState.showLiveGraph) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = "Training Session", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    var expanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                        ) {
+                            Text(text = currentSelectedSession)
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            val allSessions = if (sessions.isEmpty()) listOf(viewModel.currentSessionId) else sessions
+                            allSessions.forEach { session ->
+                                DropdownMenuItem(
+                                    text = { Text(session) },
+                                    onClick = {
+                                        viewModel.setSelectedSessionId(session)
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (graphData.isEmpty()) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text(if (uiState.showLiveGraph) "Waiting for live data..." else "No historic data found.")
+                Text(if (uiState.showLiveGraph) "Waiting for live data..." else "No historic data found for this session.")
             }
         } else {
             CartesianChartHost(
@@ -130,7 +157,6 @@ fun GraphScreen(viewModel: AppViewModel) {
                         lineProvider = LineCartesianLayer.LineProvider.series(
                             LineCartesianLayer.rememberLine(
                                 fill = LineCartesianLayer.LineFill.single(Fill(MaterialTheme.colorScheme.primary)),
-                                // a) Show a dot (point) for each measurement
                                 pointProvider = LineCartesianLayer.PointProvider.single(
                                     LineCartesianLayer.Point(
                                         rememberShapeComponent(
@@ -141,26 +167,17 @@ fun GraphScreen(viewModel: AppViewModel) {
                                 )
                             )
                         ),
-                        // b) Fixed Y-axis scale for pulse values (e.g., 40 to 160 BPM)
                         rangeProvider = CartesianLayerRangeProvider.fixed(minY = 40.0, maxY = 160.0)
                     ),
-                    // LEARNING POINT: Vertical Axis (Y-Axis)
                     startAxis = VerticalAxis.rememberStart(
                         label = axisLabelComponent,
-                        // 'step' allows us to control the interval of the labels.
-                        // Here, we show a number every 20 BPM.
                         itemPlacer = VerticalAxis.ItemPlacer.step(step = { 20.0 }),
                         title = { labelBpm },
                         titleComponent = axisTitleComponent,
-                        // STABILITY FIX: By giving the axis a fixed width, the graph doesn't 
-                        // jump left and right when heart rate changes (the "flicker" effect).
                         size = BaseAxis.Size.Fixed(72.dp)
                     ),
-                    // LEARNING POINT: Horizontal Axis (X-Axis)
                     bottomAxis = HorizontalAxis.rememberBottom(
                         label = axisLabelComponent,
-                        // 'aligned' allows us to show a label every N data points.
-                        // Here, we show a timestamp every 5 measurements.
                         itemPlacer = HorizontalAxis.ItemPlacer.aligned(
                             spacing = { 5 },
                             addExtremeLabelPadding = true
@@ -172,10 +189,8 @@ fun GraphScreen(viewModel: AppViewModel) {
                 ),
                 modelProducer = modelProducer,
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                // c) Make the x axis scrollable and zoomable
                 scrollState = scrollState,
                 zoomState = rememberVicoZoomState(),
-                // b) Use spring for smooth updates (fixes flicker) and disable initial "reveal" animation
                 animationSpec = spring(),
                 animateIn = false
             )

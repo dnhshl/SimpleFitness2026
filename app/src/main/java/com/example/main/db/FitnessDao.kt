@@ -5,26 +5,44 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * LEARNING POINT: DAO (Data Access Object)
- * This interface defines the SQL queries mapping to Kotlin functions.
+ * 
+ * Das DAO ist das Herzstück der Room Database. Hier definieren wir die SQL-Befehle 
+ * als Kotlin-Funktionen. Room generiert zur Compile-Zeit automatisch die Implementierung.
+ * 
+ * - 'suspend': Für Einmal-Operationen (Write/Delete), die in einer Coroutine laufen.
+ * - 'Flow': Für Abfragen (Read), die sich reaktiv bei Änderungen in der Datenbank aktualisieren.
  */
 @Dao
 interface FitnessDao {
 
-    // 1. STORE: Save new data. Ignore if the timestamp already exists.
+    /**
+     * Speichert einen neuen Fitness-Datensatz in der Tabelle 'fitness_log'.
+     * @OnConflictStrategy.IGNORE sorgt dafür, dass Duplikate (gleicher Timestamp) ignoriert werden.
+     */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(fitness: FitnessEntity)
 
-    // 2. RETRIEVE: Get all logs, sorted by time (newest first).
-    // We return a 'Flow' so the UI updates automatically when the DB changes.
-    @Query("SELECT * FROM fitness_log ORDER BY timestamp DESC")
-    fun getAllLogs(): Flow<List<FitnessEntity>>
+    /**
+     * SQL Abfrage: Liefert eine Liste aller eindeutigen Session-IDs (DISTINCT),
+     * sortiert nach dem neuesten Timestamp absteigend.
+     * Rückgabe als 'Flow', damit sich die UI bei neuen Sessions automatisch aktualisiert.
+     */
+    @Query("SELECT DISTINCT sessionId FROM fitness_log ORDER BY timestamp DESC")
+    fun getAllSessions(): Flow<List<String>>
 
-    // 3. FILTER: Get data based on heart rate AND time.
-    // Students can learn how SQL 'AND' works here.
-    @Query("SELECT * FROM fitness_log WHERE heartRate >= :minBpm AND timestamp >= :minTimestamp ORDER BY timestamp DESC")
-    fun getFilteredLogs(minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>>
+    /**
+     * Komplexe SQL Abfrage mit Filterung (WHERE) und Sortierung (ORDER BY):
+     * - Filtert nach spezifischer SessionID
+     * - Filtert nach minimalem Puls (heartRate >= :minBpm)
+     * - Filtert nach Zeitpunkt (timestamp >= :minTimestamp)
+     * - Sortiert absteigend nach Zeit (neueste zuerst)
+     */
+    @Query("SELECT * FROM fitness_log WHERE sessionId = :sessionId AND heartRate >= :minBpm AND timestamp >= :minTimestamp ORDER BY timestamp DESC")
+    fun getFilteredLogsBySession(sessionId: String, minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>>
 
-    // 4. DELETE: Clear history.
+    /**
+     * Löscht alle Datensätze in der 'fitness_log' Tabelle.
+     */
     @Query("DELETE FROM fitness_log")
     suspend fun deleteAll()
 }
