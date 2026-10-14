@@ -33,7 +33,8 @@ data class UiState(
     val showLiveGraph: Boolean = true,
     val isPollingEnabled: Boolean = true,
     val currentUserEmail: String? = null,
-    val currentUserNickname: String? = null
+    val currentUserNickname: String? = null,
+    val snackbarMessage: String? = null
 )
 
 /**

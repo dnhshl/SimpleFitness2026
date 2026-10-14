@@ -1,6 +1,7 @@
 package com.example.main.statemgmt
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -10,6 +11,7 @@ import com.example.main.repositories.HttpRepository
 import com.example.main.repositories.FirebaseAuthRepository
 import com.example.main.repositories.LocalFitnessRepository
 import com.example.main.ui.screens.Screen
+import com.example.main.R
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,6 +36,14 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     private val database = AppDatabase.getDatabase(application)
     private val localRepository = LocalFitnessRepository(database.fitnessDao())
 
+    private fun getStringResource(@StringRes resId: Int): String {
+        return getApplication<Application>().getString(resId)
+    }
+
+    private fun getStringResource(@StringRes resId: Int, vararg formatArgs: Any): String {
+        return getApplication<Application>().getString(resId, *formatArgs)
+    }
+
     // --- 1. UI STATE (Memory only) ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -52,7 +62,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun signIn(email: String, pass: String) {
         if (email.isBlank() || pass.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
+            showSnackbar(getStringResource(R.string.error_empty_credentials))
             return
         }
         viewModelScope.launch {
@@ -68,10 +78,12 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                             errorMessage = null
                         ) 
                     }
+                    showSnackbar(getStringResource(R.string.success_signed_in))
                     navigateTo(Screen.Home)
                 },
                 onFailure = { error ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
+                    _uiState.update { it.copy(isLoading = false) }
+                    showSnackbar(getStringResource(R.string.error_login, error.localizedMessage ?: ""))
                 }
             )
         }
@@ -79,7 +91,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun signUp(email: String, pass: String) {
         if (email.isBlank() || pass.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
+            showSnackbar(getStringResource(R.string.error_empty_credentials))
             return
         }
         viewModelScope.launch {
@@ -95,10 +107,12 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                             errorMessage = null
                         ) 
                     }
+                    showSnackbar(getStringResource(R.string.success_account_created))
                     navigateTo(Screen.Home)
                 },
                 onFailure = { error ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = error.localizedMessage) }
+                    _uiState.update { it.copy(isLoading = false) }
+                    showSnackbar(getStringResource(R.string.error_registration, error.localizedMessage ?: ""))
                 }
             )
         }
@@ -112,13 +126,13 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
         if (email.isBlank()) {
-            onResult(false, "Please enter your email address first.")
+            onResult(false, getStringResource(R.string.error_empty_email))
             return
         }
         viewModelScope.launch {
             val result = authRepository.sendPasswordReset(email)
             result.fold(
-                onSuccess = { onResult(true, "Password reset email sent successfully.") },
+                onSuccess = { onResult(true, getStringResource(R.string.success_password_reset)) },
                 onFailure = { error -> onResult(false, error.localizedMessage) }
             )
         }
@@ -129,12 +143,22 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             if (authRepository.currentUser != null) {
                 val result = authRepository.updateNickname(newNickname)
                 if (result.isSuccess) {
-                    _uiState.update { it.copy(currentUserNickname = newNickname) }
+                    _uiState.update { it.copy(currentUserNickname = newNickname, snackbarMessage = getStringResource(R.string.success_nickname_updated)) }
+                } else {
+                    _uiState.update { it.copy(snackbarMessage = getStringResource(R.string.error_nickname_update, result.exceptionOrNull()?.localizedMessage ?: "")) }
                 }
             } else {
-                dataStoreManager.updatePersistentState { it.copy(nickname = newNickname) }
+                _uiState.update { it.copy(snackbarMessage = getStringResource(R.string.error_login_required_nickname)) }
             }
         }
+    }
+
+    fun showSnackbar(message: String) {
+        _uiState.update { it.copy(snackbarMessage = message) }
+    }
+
+    fun clearSnackbarMessage() {
+        _uiState.update { it.copy(snackbarMessage = null) }
     }
 
     // --- 2. PERSISTENT STATE (Disk storage) ---
@@ -277,8 +301,12 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun navigateTo(screen: Screen) {
         if (backStack.lastOrNull() != screen) {
-            backStack.clear()
-            backStack.add(screen)
+            if (screen is Screen.Login) {
+                backStack.add(screen)
+            } else {
+                backStack.clear()
+                backStack.add(screen)
+            }
             saveBackStack()
         }
     }

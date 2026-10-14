@@ -1,41 +1,46 @@
 package com.example.main.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.main.R
 import com.example.main.statemgmt.AppViewModel
 
 /**
  * LEARNING POINT: Login Screen
  * Allows students to sign in, register, or reset password with Firebase Auth.
+ * Errors and success feedback are communicated cleanly via Snackbar.
+ * Fully responsive for Portrait and Landscape.
  */
 @Composable
 fun LoginScreen(viewModel: AppViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var feedbackMessage by remember { mutableStateOf<String?>(null) }
-    var isSuccess by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "Firebase Login", style = MaterialTheme.typography.headlineMedium)
+        Text(text = stringResource(R.string.login_title), style = MaterialTheme.typography.headlineMedium)
         
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.login_email_label)) },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -44,7 +49,7 @@ fun LoginScreen(viewModel: AppViewModel) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.login_password_label)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth()
         )
@@ -62,14 +67,14 @@ fun LoginScreen(viewModel: AppViewModel) {
                     onClick = { viewModel.signIn(email, password) },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Sign In")
+                    Text(stringResource(R.string.login_btn_signin))
                 }
 
                 OutlinedButton(
                     onClick = { viewModel.signUp(email, password) },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Register")
+                    Text(stringResource(R.string.login_btn_register))
                 }
             }
 
@@ -77,27 +82,17 @@ fun LoginScreen(viewModel: AppViewModel) {
 
             TextButton(
                 onClick = {
-                    viewModel.sendPasswordReset(email) { success, msg ->
-                        isSuccess = success
-                        feedbackMessage = msg
+                    if (email.isBlank()) {
+                        viewModel.showSnackbar("Please enter your email address first.")
+                    } else {
+                        viewModel.sendPasswordReset(email) { _, msg ->
+                            viewModel.showSnackbar(msg ?: "")
+                        }
                     }
                 }
             ) {
-                Text("Forgot Password? Reset")
+                Text(stringResource(R.string.login_forgot_password))
             }
-        }
-
-        uiState.errorMessage?.let { error ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = error, color = MaterialTheme.colorScheme.error)
-        }
-
-        feedbackMessage?.let { msg ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = msg,
-                color = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-            )
         }
     }
 }

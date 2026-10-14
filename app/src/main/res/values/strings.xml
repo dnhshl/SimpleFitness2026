@@ -25,4 +25,37 @@
     <!-- Graph Screen -->
     <string name="label_axis_time">Time</string>
     <string name="label_axis_heart_rate">Heart Rate (BPM)</string>
+
+    <!-- Account & Menu -->
+    <string name="desc_account_menu">Account Menu</string>
+    <string name="label_user_prefix">User: %s</string>
+    <string name="label_guest_mode">Mode: Guest</string>
+    <string name="label_name_prefix">Name: %s</string>
+    <string name="menu_edit_nickname">Edit Nickname</string>
+    <string name="menu_logout">Logout</string>
+    <string name="menu_login_register">Login / Register</string>
+    <string name="dialog_edit_nickname_title">Edit Nickname</string>
+    <string name="dialog_nickname_label">Nickname</string>
+    <string name="dialog_save">Save</string>
+    <string name="dialog_cancel">Cancel</string>
+
+    <!-- Login Screen -->
+    <string name="login_title">Firebase Login</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_btn_signin">Sign In</string>
+    <string name="login_btn_register">Register</string>
+    <string name="login_forgot_password">Forgot Password? Reset</string>
+
+    <!-- Auth & ViewModel Messages -->
+    <string name="error_empty_credentials">Email and password cannot be empty</string>
+    <string name="success_signed_in">Successfully signed in!</string>
+    <string name="error_login">Login Error: %s</string>
+    <string name="success_account_created">Account created successfully!</string>
+    <string name="error_registration">Registration Error: %s</string>
+    <string name="error_empty_email">Please enter your email address first.</string>
+    <string name="success_password_reset">Password reset email sent successfully.</string>
+    <string name="success_nickname_updated">Nickname updated successfully!</string>
+    <string name="error_nickname_update">Failed to update nickname: %s</string>
+    <string name="error_login_required_nickname">You must be logged in to set a nickname.</string>
 </resources>
