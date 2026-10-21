@@ -1,14 +1,17 @@
 package com.example.main.statemgmt
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.main.db.AppDatabase
 import com.example.main.repositories.HttpRepository
+import com.example.main.repositories.FirebaseAuthRepository
 import com.example.main.repositories.LocalFitnessRepository
 import com.example.main.ui.screens.Screen
+import com.example.main.R
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,17 +25,22 @@ import java.time.format.DateTimeFormatter
 
 /**
  * The Central Control Center (ViewModel) of your App.
+ * 
+ * Das ViewModel verbindet die UI (Compose Screens) mit den Datenquellen 
+ * (Netzwerk via Ktor und lokale Room Database) und verwaltet den UI-Zustand.
  */
 class AppViewModel(application: Application, private val savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
+    // --- REPOSITORIES & DATA SOURCES ---
     private val dataStoreManager = DataStoreManager(application)
     private val httpRepository = HttpRepository(application)
+    private val authRepository = FirebaseAuthRepository()
     
     // LEARNING POINT: Database Initialization
     private val database = AppDatabase.getDatabase(application)
     private val localRepository = LocalFitnessRepository(database.fitnessDao())
 
-    // --- SESSION ID FOR ROOM DB FILTERING ---
+    // --- SESSION ID MANAGEMENT ---
     var currentSessionId: String = generateNewSessionId()
         private set
 
@@ -43,21 +51,130 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     val availableSessions: StateFlow<List<String>> = localRepository.allSessions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- 1. UI STATE (Memory only) ---
+    // --- 1. UI STATE & AUTHENTICATION ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
+        updateAuthState()
         if (_uiState.value.isPollingEnabled) {
             startPollingInternal()
         }
     }
 
-    fun setSelectedSessionId(sessionId: String?) {
-        _uiState.update { it.copy(selectedSessionId = sessionId) }
+    /**
+     * Aktualisiert den provider-unabhängigen Authentifizierungsstatus im UI-Zustand.
+     */
+    private fun updateAuthState() {
+        val user = authRepository.currentUser
+        _uiState.update { 
+            it.copy(
+                isAuthenticated = user != null,
+                currentUserId = user?.uid,
+                currentUserEmail = user?.email,
+                currentUserDisplayName = user?.displayName
+            )
+        }
     }
 
-    // --- 2. PERSISTENT STATE (Disk storage) ---
+    /**
+     * Meldet einen Benutzer mit E-Mail und Passwort via Firebase Auth an.
+     */
+    fun signIn(email: String, pass: String) {
+        if (email.isBlank() || pass.isBlank()) {
+            showSnackbar(getStringResource(R.string.error_empty_credentials))
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = authRepository.signIn(email, pass)
+            result.fold(
+                onSuccess = { _ ->
+                    updateAuthState()
+                    _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                    showSnackbar(getStringResource(R.string.success_signed_in))
+                    navigateTo(Screen.Home)
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(isLoading = false) }
+                    showSnackbar(getStringResource(R.string.error_login, error.localizedMessage ?: ""))
+                }
+            )
+        }
+    }
+
+    /**
+     * Registriert einen neuen Benutzer bei Firebase Auth.
+     */
+    fun signUp(email: String, pass: String) {
+        if (email.isBlank() || pass.isBlank()) {
+            showSnackbar(getStringResource(R.string.error_empty_credentials))
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = authRepository.signUp(email, pass)
+            result.fold(
+                onSuccess = { _ ->
+                    updateAuthState()
+                    _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                    showSnackbar(getStringResource(R.string.success_account_created))
+                    navigateTo(Screen.Home)
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(isLoading = false) }
+                    showSnackbar(getStringResource(R.string.error_registration, error.localizedMessage ?: ""))
+                }
+            )
+        }
+    }
+
+    /**
+     * Meldet den aktuellen Benutzer von Firebase Auth ab.
+     */
+    fun signOut() {
+        authRepository.signOut()
+        updateAuthState()
+        navigateTo(Screen.Home)
+    }
+
+    /**
+     * Sendet eine E-Mail zum Zurücksetzen des Passworts.
+     */
+    fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
+        if (email.isBlank()) {
+            onResult(false, getStringResource(R.string.error_empty_email))
+            return
+        }
+        viewModelScope.launch {
+            val result = authRepository.sendPasswordReset(email)
+            result.fold(
+                onSuccess = { onResult(true, getStringResource(R.string.success_password_reset)) },
+                onFailure = { error -> onResult(false, error.localizedMessage) }
+            )
+        }
+    }
+
+    /**
+     * Aktualisiert den Anzeigenamen (Nickname) des angemeldeten Benutzers in Firebase Auth.
+     */
+    fun setNickname(newNickname: String) {
+        viewModelScope.launch {
+            if (authRepository.currentUser != null) {
+                val result = authRepository.updateNickname(newNickname)
+                if (result.isSuccess) {
+                    updateAuthState()
+                    _uiState.update { it.copy(snackbarMessage = getStringResource(R.string.success_nickname_updated)) }
+                } else {
+                    _uiState.update { it.copy(snackbarMessage = getStringResource(R.string.error_nickname_update, result.exceptionOrNull()?.localizedMessage ?: "")) }
+                }
+            } else {
+                _uiState.update { it.copy(snackbarMessage = getStringResource(R.string.error_login_required_nickname)) }
+            }
+        }
+    }
+
+    // --- 2. PERSISTENT STATE (Disk storage via DataStore) ---
     val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
         .stateIn(
             scope = viewModelScope,
@@ -65,7 +182,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             initialValue = PersistentUiState()
         )
 
-    // --- 3. DATABASE FILTERING & TRANSFORMATIONS ---
+    // --- 3. DATABASE FILTERING & TRANSFORMATIONS (Room DB Reactive Pipeline) ---
     
     /**
      * LEARNING POINT: Reaktive Datenverarbeitung & Flow-Kombination
@@ -116,12 +233,13 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- 4. DATA POLLING ENGINE ---
+    // --- 4. DATA POLLING ENGINE (Network & Auto-Persistence) ---
     private var pollingJob: Job? = null
 
     fun setMinBpmFilter(value: Int) { _uiState.update { it.copy(minBpmFilter = value) } }
     fun setTimeFilter(minutes: Int) { _uiState.update { it.copy(timeFilterMinutes = minutes) } }
     fun setGraphSource(isLive: Boolean) { _uiState.update { it.copy(showLiveGraph = isLive) } }
+    fun setSelectedSessionId(sessionId: String?) { _uiState.update { it.copy(selectedSessionId = sessionId) } }
     
     /**
      * Master Switch: Toggles the background data collection.
@@ -203,7 +321,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     }
 
     // =========================================================================
-    // BOILERPLATE AREA: NAVIGATION HANDLING
+    // BOILERPLATE AREA: NAVIGATION HANDLING & HELPERS
     // =========================================================================
 
     private val savedBackStack: List<Screen>? = savedStateHandle.get<String>("backstack_keys")?.let {
@@ -220,8 +338,12 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun navigateTo(screen: Screen) {
         if (backStack.lastOrNull() != screen) {
-            backStack.clear()
-            backStack.add(screen)
+            if (screen is Screen.Login) {
+                backStack.add(screen)
+            } else {
+                backStack.clear()
+                backStack.add(screen)
+            }
             saveBackStack()
         }
     }
@@ -231,5 +353,33 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             backStack.removeLastOrNull()
             saveBackStack()
         }
+    }
+
+    /**
+     * Triggert das Anzeigen einer Snackbar in der UI.
+     */
+    fun showSnackbar(message: String) {
+        _uiState.update { it.copy(snackbarMessage = message) }
+    }
+
+    /**
+     * Setzt die Snackbar-Nachricht nach dem Anzeigen im UI zurück.
+     */
+    fun clearSnackbarMessage() {
+        _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    /**
+     * Hilfsfunktion zum Auslesen von String-Ressourcen (vermeidet Boilerplate im ViewModel).
+     */
+    private fun getStringResource(@StringRes resId: Int): String {
+        return getApplication<Application>().getString(resId)
+    }
+
+    /**
+     * Hilfsfunktion zum Auslesen von String-Ressourcen mit Formatierungsparametern.
+     */
+    private fun getStringResource(@StringRes resId: Int, vararg formatArgs: Any): String {
+        return getApplication<Application>().getString(resId, *formatArgs)
     }
 }

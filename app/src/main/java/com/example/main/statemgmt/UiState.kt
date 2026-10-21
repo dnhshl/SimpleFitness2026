@@ -33,7 +33,13 @@ data class UiState(
     val showLiveGraph: Boolean = true,
     val isPollingEnabled: Boolean = false,
     val snackbarMessage: String? = null,
-    val selectedSessionId: String? = null
+    val selectedSessionId: String? = null,
+
+    // Provider-agnostic Authentication State
+    val isAuthenticated: Boolean = false,
+    val currentUserId: String? = null,
+    val currentUserEmail: String? = null,
+    val currentUserDisplayName: String? = null
 )
 
 /**

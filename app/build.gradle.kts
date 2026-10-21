@@ -7,12 +7,16 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 configure<ApplicationExtension> {
     namespace = "com.example.main"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.simpleSQL"
+        applicationId = "com.example.simplefitnessfirebase"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
@@ -81,4 +85,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // Firebase Authentication
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
 }
