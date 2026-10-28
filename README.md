@@ -1,102 +1,101 @@
-# 🚀 SimpleFitness & Firebase Auth Template (Zwischenstand)
+# 🚀 SimpleFitness & Firebase Cloud Architecture (V1.0)
 
-Willkommen zur Lerneinheit **Firebase Authentication & State Management**! 
+Willkommen zur erweiterten Lerneinheit **Cloud Firestore & Offline-First Sync**! 
 
-Dieses Projekt dient als **Master-Template** und wichtiger **Zwischenstand** für eure Projektarbeiten. Wir haben lokale Persistenz (**Room Database**) erfolgreich mit Cloud-Authentifizierung (**Firebase Auth**) verknüpft. In kommenden Lerneinheiten werden wir diesen Stand Schritt für Schritt um weitere Cloud-Dienste (wie z. B. **Cloud Firestore** für die Cloud-Synchronisation) erweitern.
-
-Nachdem ihr in der Vorlesung die absoluten Grundlagen kennengelernt habt, erarbeitet ihr euch die neuen Konzepte in dieser App im **Reverse Engineering**.
+Dieses Projekt dient als **Master-Template** und zeigt die vollständige Verbindung von lokaler Persistenz (**Room Database / SQL**), reaktivem State Management (**Jetpack Compose & StateFlow**), Cloud-Authentifizierung (**Firebase Auth**) und Cloud-Datenbank (**Cloud Firestore / NoSQL**).
 
 ---
 
-## 🎨 Neue UI-Konzepte: Verstehen & Anwenden
+## 📚 1. Grundlagen: Was ist Cloud Firestore & wie unterscheidet es sich von SQL (Room)?
 
-In dieser Lerneinheit führen wir zwei wichtige UI-Entwurfsmuster ein, die euch in fast jeder professionellen Android-App begegnen werden:
+### Was ist Cloud Firestore?
+Cloud Firestore ist eine flexible, skalierbare **NoSQL-Dokumentendatenbank** in der Cloud von Google Firebase. Im Gegensatz zu relationalen Datenbanken speichert Firestore keine Daten in starren Tabellen mit Zeilen und Spalten.
 
-### 1. Was ist eine Snackbar und wofür nutzen wir sie?
-* **Was ist das?** Eine `Snackbar` ist eine kompakte, schwebende Benachrichtigung (Toast-ähnlich, aber mächtiger), die kurzzeitig am unteren Bildschirmrand erscheint.
-* **Wofür nutzen wir sie?** In unserer App nutzen wir sie als **zentralen Feedback-Kanal** für Erfolgsmeldungen (z. B. *„Password reset email sent successfully.“*) oder Fehlermeldungen (z. B. falsches Passwort beim Login).
-* **Warum keine Inline-Fehlertexte?** Statt Formulare mit Fehlermeldungen zu überladen, hält die Snackbar das UI sauber und verschwindet nach kurzer Zeit von selbst (oder lässt sich wegwischen).
-* **Wie funktioniert sie technisch bei uns?** 
-  - Das ViewModel setzt eine Nachricht in den `UiState` (`snackbarMessage`).
-  - Die `MainActivity` lauscht reaktiv per `LaunchedEffect(uiState.snackbarMessage)` darauf und zeigt sie über einen globalen `SnackbarHost` an.
-
-### 2. Einbinden von Menüs in die Statusleiste (TopAppBar Actions & DropdownMenu)
-* **Das Problem**: Auf den Inhalts-Screens (Home, Graph, History) wollen wir Platz sparen und den Nutzer nicht mit Login-Formularen überladen.
-* **Die Lösung**: Die obere Statusleiste (`TopAppBar`) bietet sogenannte **Actions** auf der rechten Seite. 
-* **Die Umsetzung**: Wir haben dort ein Account-Icon (`AccountCircle`) platziert. Ein Klick darauf öffnet ein reaktives **`DropdownMenu`** (ein Overlay-Menü).
-* **Was bietet das Menü?** Es zeigt den aktuellen Status (*„User: mail@...“* oder *„Mode: Guest“*), färbt sich bei erfolgreichem Login **grün** ein und bietet kontextabhängige Aktionen wie *„Edit Nickname“*, *„Logout“* oder *„Login / Register“*.
+### Die wichtigsten Unterschiede zu SQL (Room):
+| Merkmal | Relationale DB (Room / SQLite) | NoSQL DB (Cloud Firestore) |
+| :--- | :--- | :--- |
+| **Datenstruktur** | Tabellen, Zeilen, Spalten, Foreign Keys | Collections (Sammlungen) & Documents (Dokumente) |
+| **Schema** | **Starr** (Änderungen erfordern DB-Migrationen) | **Dynamisch / Schemalos** (Dokumente in derselben Collection können unterschiedliche Felder haben) |
+| **Einsatzort** | Lokal auf dem Smartphone (Offline-First) | In der Cloud (Multi-Device, Serverless, Echtzeit) |
+| **Abfragen** | Komplexe Joins (`JOIN`), Aggregationen | Flache Abfragen, Dokumenten-ID-basiert, Subcollections |
 
 ---
 
-## 🏗️ Architektur & Logische Konzepte
+## 🗂️ 2. Die Datenstruktur in Firestore und „Warum sie so ist“
 
-### 1. Das Repository-Pattern für Firebase (`FirebaseAuthRepository.kt`)
-Das Firebase SDK wird sauber in ein eigenes Repository gekapselt. Das Repository übernimmt alle direkten Aufrufe von Firebase Auth und liefert Kotlin `Result`-Objekte zurück.
+Um Daten sauber nach Nutzern und Trainingseinheiten zu trennen, verwenden wir eine **hierarchische Dokumenten- und Subcollection-Struktur**:
 
-### 2. Provider-Agnostischer Auth-Zustand im `UiState`
-Statt den Login-Status fest an eine spezifische Anmeldemethode (wie E-Mail) zu binden, hält der zentrale `UiState` allgemeine Flags vor:
-```kotlin
-val isAuthenticated: Boolean = false,
-val currentUserId: String? = null,
-val currentUserEmail: String? = null,
-val currentUserDisplayName: String? = null
-```
-Jeder Screen kann diesen Zustand über `viewModel.uiState.collectAsState()` beobachten.
-
-### 3. Asynchrone Rückgaben mit Lambda-Callbacks (`onResult`) & Zusammenspiel mit der Snackbar
-Da Authentifizierungs-Operationen in Firebase asynchron ablaufen, nutzen wir **Lambdas als Funktionsparameter** (Callbacks), um Erfolge oder Fehlermeldungen an den Aufrufer (z. B. das UI) zurückzumelden:
-```kotlin
-fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit)
+```text
+users/
+  └── {uid}/ (Dokument für jeden registrierten Nutzer, basierend auf der Auth-UID)
+      └── sessions/ (Collection aller Trainingseinheiten dieses Nutzers)
+          └── {sessionId}/ (Ein Dokument pro Session, z.B. "Session 27.10.2026...")
+              └── readings/ (Subcollection aller Messwerte dieser Session)
+                  └── {timestamp} (Einzelnes Messwert-Dokument: Puls, Fitness-Score, Timestamp)
 ```
 
-#### Wie wird das im UI (`LoginScreen.kt`) aufgerufen?
-Beim Klick auf *„Forgot Password? Reset“* übergibt das UI einen Lambda-Block als Argument für `onResult`:
-```kotlin
-viewModel.sendPasswordReset(email) { _, msg ->
-    // Dieser Codeblock wird erst ausgeführt, wenn Firebase das Ergebnis liefert!
-    viewModel.showSnackbar(msg ?: "")
-}
-```
-
-#### Das Zusammenspiel mit der Snackbar:
-1. Das ViewModel führt den asynchronen Netzwerkaufruf aus.
-2. Sobald Firebase antwortet, ruft das ViewModel den Callback `onResult(true, "Password reset email sent successfully.")` auf.
-3. Im UI fängt das Lambda diesen String (`msg`) ab und ruft `viewModel.showSnackbar(msg)` auf.
-4. `showSnackbar` speichert den Text im `UiState` (`snackbarMessage`).
-5. Die `MainActivity` bemerkt dies über `LaunchedEffect(uiState.snackbarMessage)` und blendet die Nachricht elegant als **Snackbar** am unteren Bildschirmrand ein.
+### Warum diese Struktur?
+1. **Datenschutz & Security Rules**: Durch die Wurzel-Kollektion `users/{uid}/...` greift die Firestore-Sicherheitsregel (`request.auth.uid == userId`) perfekt. Niemand kann jemals die Daten eines anderen Nutzers lesen oder schreiben.
+2. **Vermeidung des 1-MB-Limits**: Firestore-Dokumente haben ein hartes Limit von 1 MB pro Dokument. Hätten wir alle Messwerte einer stundenlangen Session als Array in ein einziges Dokument geschrieben, würde dieses Limit schnell gesprengt werden. Durch die Unterteilung in `readings/{timestamp}` bleibt jedes Dokument federleicht.
+3. **Effizientes Laden**: Die App kann zuerst nur die Liste der Sessions (`sessions`) abrufen und erst beim Öffnen einer Session die dazugehörigen `readings` laden oder filtern.
 
 ---
 
-## 🔍 Leitfaden zum Reverse Engineering
+## 🔄 3. Datenfluss & Use-Case-Szenarien (Offline-First & Sync)
 
-Um dieses Template für eure eigenen Projekte zu verstehen und anzupassen, solltet ihr den Weg eines Events von der UI bis zum Backend nachvollziehen:
+Die App implementiert ein robustes **Offline-First-Synchronisationsmodell**, das zwei Richtungen unterscheidet:
 
-1. **Der Startpunkt (UI)**: Schaut in `LoginScreen.kt`. Wenn ein Nutzer auf *Sign In* klickt, wird `viewModel.signIn(email, password)` aufgerufen.
-2. **Die Geschäftslogik (ViewModel)**: Im `AppViewModel.kt` startet eine Coroutine, die `authRepository.signIn(...)` aufruft.
-3. **Die Status-Aktualisierung**: Nach erfolgreichem Login aktualisiert `updateAuthState()` den `uiState`. 
-4. **Die Reaktivität (UI-Update)**: Die `MainActivity` bemerkt den neuen Zustand, färbt das Account-Icon in der TopBar grün und zeigt den Nickname an.
+### Szenario A: Push-Sync (Lokal ➡️ Cloud)
+- **Ablauf**: Der HTTP-Poller (oder später der ESP32-Sensor) erzeugt Messwerte. Die App speichert diese sofort lokal in der **Room DB** (mit `isSynced = false`).
+- **Cloud-Backup**: Ist der Nutzer eingeloggt, werden die Daten im Hintergrund in **Cloud Firestore** geschrieben. Bei Erfolg wird das lokale Flag auf `isSynced = true` gesetzt.
+- **Offline-Puffer**: Hat das Smartphone kein Internet, bleiben die Daten sicher in Room. Sobald wieder Netz da ist oder die App neu startet, lädt der `syncOfflineDataToCloud()`-Job die ungesyncten Daten im Batch-Verfahren nach Firestore hoch.
+
+### Szenario B: Pull-Sync / Diff-Sync (Cloud ➡️ Lokal)
+- **Ablauf**: Ist der Nutzer eingeloggt, kann er explizit den **„Sync with Cloud“**-Button auf dem Home Screen betätigen.
+- **Intelligenter Abgleich**: Die App prüft welche Sessions bereits lokal in Room vorliegen (`localRepository.getAllSessionsList`), vergleicht sie mit Firestore und lädt **nur** die fehlenden Sessions herunter (`fetchMissingCloudReadings`).
+- **Use Case**: *Multi-Device-Support*. Trainiert der Nutzer auf einem Zweitgerät, holt er sich per Knopfdruck seine historischen Daten auf das Hauptgerät, ohne lokale Offline-Sessions zu überschreiben.
 
 ---
 
 ## 🛠️ Aufgaben & Übungen für euer Verständnis
 
-### Aufgabe 1: Anonyme Anmeldung (Anonymous Auth) hinzufügen
-1. Aktiviert in der Firebase Console unter **Authentication -> Sign-in method** den Anbieter **Anonym**.
-2. Fügt im `FirebaseAuthRepository` eine Methode `signInAnonymously()` hinzu.
-3. Ergänzt im Account-Menü in der `MainActivity` einen Button „Als Gast fortfahren“, der diese Methode aufruft.
+### Aufgabe 1: Testen des Cloud-Syncs (Pull-Sync)
+1. **Ziel**: Verifiziere, dass der explizite Cloud-Sync fehlerfrei funktioniert.
+2. **Schritte**: 
+   - Zeichne eine Live-Session auf (während du eingeloggt bist).
+   - Klicke auf den **„Clear History“**-Button (Ergebnis: Die lokale Room-DB ist leer, der History-Screen zeigt keine Daten mehr).
+   - Klicke auf den **„Sync with Cloud“**-Button auf dem Home Screen.
+   - Prüfe den History-Screen: Sind alle Daten originalgetreu aus der Cloud zurückgekehrt?
 
-### Aufgabe 2: Passwort-Sichtbarkeit umschalten
-Auf dem `LoginScreen` ist das Passwort derzeit fest maskiert (`PasswordVisualTransformation`). 
-- Fügt ein Icon (Auge-Symbol) an das Passwort-Textfeld an, mit dem der Nutzer sein eingegebenes Passwort ein- und ausblenden kann (Tipp: Ein booleaner `var passwordVisible by remember { mutableStateOf(false) }`-State im Composable).
+### Aufgabe 2: Erweiterte Lösch-Optionen (Dialog & Cloud-Löschung)
+1. **Ziel**: Erweitere den bestehenden Lösch-Button um einen Auswahldialog mit feineren Lösch-Szenarien.
+2. **Schritte**:
+   - Wenn der Nutzer auf den Mülleimer-Button drückt, öffne ein AlertDialog (`AlertDialog`).
+   - Biete dem Nutzer 4 klare Optionen an:
+     - **a) Alles lokal löschen** (Room DB leeren)
+     - **b) Alles lokal und in der Cloud löschen** (Room DB + Firestore `users/{uid}/sessions` komplett löschen)
+     - **c) Aktuell angezeigte Session nur lokal löschen**
+     - **d) Aktuell angezeigte Session lokal und in der Cloud löschen**
+   - Nutze im `FirestoreRepository` Methoden wie `document.delete()` für einzelne Sessions oder deren Subcollections.
 
-### Aufgabe 3: Profil-Screen erstellen
-1. Erstellt einen neuen Screen `ProfileScreen.kt`.
-2. Zeigt dort die `currentUserId`, die E-Mail und den aktuellen Nickname an.
-3. Ermöglicht es dem Nutzer dort direkt, seinen Nickname zu ändern (nutzt dafür die bereits vorhandene `viewModel.setNickname(...)`-Funktion).
+### Aufgabe 3: App-Config via Cloud (Spruch des Tages / Master Data & Security Rules)
+1. **Ziel**: Lade globale Admin-Inhalte (z. B. Motivationssprüche) beim Start direkt aus Firestore.
+2. **Schritte**:
+   - Da die `quotes`-Kollektion auf der **Root-Ebene** (außerhalb von `users/{uid}`) liegt, musst du in der Firebase Console unter **Rules** den Lesezugriff für diese Kollektion erlauben (z. B. `match /quotes/{quoteId} { allow read: if request.auth != null; }`).
+   - Lege in deiner Firebase Console eine Kollektion namens `quotes` an und erstelle dort Dokumente mit einem Feld `text` (z. B. *"Consistency is key!"*, *"Push your limits!"*, *"Rest is part of training"*).
+   - Erweitere das Repository so, dass alle Sprüche aus `quotes` abgerufen und per `random()` ausgewählt werden.
+   - Zeige diesen Spruch als Banner auf dem `HomeScreen` an.
+
+### Aufgabe 4: Server-Filter (Direkter Cloud-Abruf ohne Room)
+1. **Ziel**: Vergleiche den lokalen SQL-Ansatz mit direktem NoSQL-Cloud-Abruf.
+2. **Schritte**:
+   - Erstelle einen neuen Screen **`History2Screen.kt`** als exakte Kopie des `HistoryScreen.kt`.
+   - Statt die Daten reaktiv über `localRepository.getFilteredDataBySession` aus Room zu laden, frage die Daten in `History2Screen` asynchron direkt über `FirestoreRepository` von den Firebase-Servern ab.
+   - Diskutiert im Team: Wo liegen die Vor- und Nachteile von Room (lokaler Cache) gegenüber direktem Cloud-Abruf?
 
 ---
 
 ## 📚 Hilfreiche Ressourcen
-*   **Material Design Snackbars**: [Android Compose Snackbar Guide](https://developer.android.com/jetpack/compose/components/snackbar)
-*   **Material Design Menus**: [Android Compose Menus](https://developer.android.com/jetpack/compose/menu)
-*   **Firebase Auth Guide**: [Android Firebase Authentication](https://firebase.google.com/docs/auth/android/start)
+*   **Firestore Data Model**: [Official Firestore Data Model Guide](https://firebase.google.com/docs/firestore/data-model)
+*   **Firestore Queries**: [Perform Simple and Compound Queries in Firestore](https://firebase.google.com/docs/firestore/query-data/queries)
+*   **Offline Data**: [Enable Offline Data in Firestore](https://firebase.google.com/docs/firestore/manage-data/enable-offline)

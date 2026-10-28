@@ -12,7 +12,7 @@ import com.example.main.statemgmt.AppViewModel
 
 /**
  * The Home Screen template.
- * Displays the Live Data streaming switch.
+ * Displays the Live Data streaming switch and explicit Cloud Sync controls when authenticated.
  */
 @Composable
 fun HomeScreen(viewModel: AppViewModel) {
@@ -54,6 +54,32 @@ fun HomeScreen(viewModel: AppViewModel) {
                     checked = uiState.isPollingEnabled,
                     onCheckedChange = { viewModel.setPollingEnabled(it) }
                 )
+            }
+        }
+
+        // --- 2. EXPLICIT CLOUD SYNC CARD (Visible only when authenticated) ---
+        if (uiState.isAuthenticated) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "Cloud Synchronization", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Download your historical sessions from Firebase Firestore.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Button(
+                        onClick = { viewModel.syncFromCloud() },
+                        modifier = Modifier.align(Alignment.End),
+                        enabled = !uiState.isLoading
+                    ) {
+                        Text(if (uiState.isLoading) "Syncing..." else "Sync with Cloud")
+                    }
+                }
             }
         }
     }

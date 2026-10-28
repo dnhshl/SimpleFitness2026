@@ -6,19 +6,34 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * LEARNING POINT: Repository Pattern
- * Abstracts the Room DB data source, supporting session-based queries.
+ * Abstracts the Room DB data source, supporting multi-user isolation (userId) and sync.
  */
 class LocalFitnessRepository(private val fitnessDao: FitnessDao) {
 
-    val allSessions: Flow<List<String>> = fitnessDao.getAllSessions()
+    fun getAllSessions(userId: String): Flow<List<String>> = fitnessDao.getAllSessions(userId)
 
-    suspend fun saveReading(timestamp: String, bpm: Int, fitness: Double, sessionId: String) {
-        val entity = FitnessEntity(timestamp, sessionId, bpm, fitness)
+    suspend fun getAllSessionsList(userId: String): List<String> = fitnessDao.getAllSessionsList(userId)
+
+    suspend fun saveReading(timestamp: String, bpm: Int, fitness: Double, sessionId: String, userId: String) {
+        val entity = FitnessEntity(timestamp, userId, sessionId, bpm, fitness, isSynced = false)
         fitnessDao.insert(entity)
     }
 
-    fun getFilteredDataBySession(sessionId: String, minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>> {
-        return fitnessDao.getFilteredLogsBySession(sessionId, minBpm, minTimestamp)
+    suspend fun saveReadingPreSynced(timestamp: String, sessionId: String, bpm: Int, fitness: Double, userId: String) {
+        val entity = FitnessEntity(timestamp, userId, sessionId, bpm, fitness, isSynced = true)
+        fitnessDao.insert(entity)
+    }
+
+    fun getFilteredDataBySession(userId: String, sessionId: String, minBpm: Int, minTimestamp: String): Flow<List<FitnessEntity>> {
+        return fitnessDao.getFilteredLogsBySession(userId, sessionId, minBpm, minTimestamp)
+    }
+
+    suspend fun getUnsyncedReadings(userId: String): List<FitnessEntity> {
+        return fitnessDao.getUnsyncedReadings(userId)
+    }
+
+    suspend fun markAsSynced(timestamps: List<String>) {
+        fitnessDao.markAsSynced(timestamps)
     }
 
     suspend fun clearHistory() {

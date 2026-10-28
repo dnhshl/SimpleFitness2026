@@ -58,4 +58,5 @@
     <string name="success_nickname_updated">Nickname updated successfully!</string>
     <string name="error_nickname_update">Failed to update nickname: %s</string>
     <string name="error_login_required_nickname">You must be logged in to set a nickname.</string>
+    <string name="success_cloud_synced">Cloud data successfully synchronized!</string>
 </resources>

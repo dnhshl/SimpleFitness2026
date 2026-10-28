@@ -8,8 +8,9 @@ import androidx.room.RoomDatabase
 /**
  * LEARNING POINT: Room Database
  * The main access point to the local database.
+ * Version 3: Added multi-user isolation (userId) and sync flags.
  */
-@Database(entities = [FitnessEntity::class], version = 2, exportSchema = false)
+@Database(entities = [FitnessEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     
     abstract fun fitnessDao(): FitnessDao
@@ -25,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fitness_database"
                 )
-                    .fallbackToDestructiveMigration(true)
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
