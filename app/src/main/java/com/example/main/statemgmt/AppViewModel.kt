@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.main.db.AppDatabase
+import com.example.main.repositories.BleRepository
 import com.example.main.repositories.HttpRepository
 import com.example.main.repositories.FirebaseAuthRepository
 import com.example.main.repositories.FirestoreRepository
@@ -30,7 +31,7 @@ import java.time.format.DateTimeFormatter
  * The Central Control Center (ViewModel) of your App.
  * 
  * Das ViewModel verbindet die UI (Compose Screens) mit den Datenquellen 
- * (Netzwerk via Ktor und lokale Room Database) und verwaltet den UI-Zustand.
+ * (Netzwerk via Ktor, Bluetooth via Kable und lokale Room Database) und verwaltet den UI-Zustand.
  */
 class AppViewModel(application: Application, private val savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
@@ -39,10 +40,15 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     private val httpRepository = HttpRepository(application)
     private val authRepository = FirebaseAuthRepository()
     private val firestoreRepository = FirestoreRepository()
+    private val bleRepository = BleRepository()
     
     // LEARNING POINT: Database Initialization
     private val database = AppDatabase.getDatabase(application)
     private val localRepository = LocalFitnessRepository(database.fitnessDao())
+
+    // --- BLE JOBS ---
+    private var scanJob: Job? = null
+    private var bleCollectJob: Job? = null
 
     // --- SESSION ID MANAGEMENT ---
     var currentSessionId: String = generateNewSessionId()
@@ -68,7 +74,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        // Reactive listener for Firebase Auth state (handles async startup restoration & login/logout)
+        // Reactive listener for Firebase Auth state
         val authListener = FirebaseAuth.AuthStateListener { _ ->
             updateAuthState()
             val user = authRepository.currentUser
@@ -87,15 +93,128 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             }
         }
 
-        if (_uiState.value.isPollingEnabled) {
+        if (_uiState.value.isPollingEnabled && _uiState.value.dataSource == DataSource.HTTP) {
             startPollingInternal()
+        }
+    }
+
+    // --- BLE MANAGEMENT ---
+
+    fun setDataSource(source: DataSource) {
+        _uiState.update { it.copy(dataSource = source) }
+        if (source == DataSource.HTTP && _uiState.value.isPollingEnabled) {
+            startPollingInternal()
+        } else {
+            stopPollingInternal()
+        }
+    }
+
+    fun startScanning() {
+        if (_uiState.value.isScanning) return
+        _uiState.update { it.copy(isScanning = true, foundDevices = emptyList(), errorMessage = null) }
+        scanJob = viewModelScope.launch {
+            try {
+                bleRepository.advertisements.collect { device ->
+                    _uiState.update { state ->
+                        if (state.foundDevices.any { it.address == device.address }) state
+                        else state.copy(foundDevices = state.foundDevices + device)
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Scan Error: ${e.localizedMessage}", isScanning = false) }
+            }
+        }
+    }
+
+    fun stopScanning() {
+        scanJob?.cancel()
+        scanJob = null
+        _uiState.update { it.copy(isScanning = false) }
+    }
+
+    fun connectToDevice(address: String) {
+        stopScanning()
+        _uiState.update { it.copy(connectionState = ConnectionState.Connecting, errorMessage = null) }
+        viewModelScope.launch {
+            try {
+                val fitnessFlow = bleRepository.connect(address)
+                _uiState.update { it.copy(connectionState = ConnectionState.Connected, dataSource = DataSource.BLE) }
+                
+                viewModelScope.launch { dataStoreManager.saveLastDevice(address) }
+
+                bleCollectJob = viewModelScope.launch {
+                    fitnessFlow.collect { fitnessData ->
+                        handleNewFitnessData(fitnessData, rawJson = "Puls: ${fitnessData.puls}, Fitness: ${fitnessData.fitness}")
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(connectionState = ConnectionState.Disconnected, errorMessage = "Connection Error: ${e.localizedMessage}") }
+            }
+        }
+    }
+
+    fun disconnect() {
+        viewModelScope.launch {
+            bleCollectJob?.cancel()
+            bleCollectJob = null
+            bleRepository.disconnect()
+            _uiState.update { it.copy(connectionState = ConnectionState.Disconnected) }
+        }
+    }
+
+    fun toggleAutoConnect(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.saveAutoConnect(enabled)
+        }
+    }
+
+    /**
+     * LEARNING POINT: Unified Data Ingestion
+     * Verarbeitet neue Fitness-Daten unabhängig von der Quelle (HTTP oder BLE),
+     * aktualisiert den UI-Zustand, speichert lokal in Room und sichert in Firestore.
+     */
+    private fun handleNewFitnessData(data: FitnessData, rawJson: String) {
+        _uiState.update { state -> 
+            val newHistory = (state.fitnessHistory + data).takeLast(100)
+            state.copy(
+                lastReceivedData = data,
+                fitnessHistory = newHistory,
+                rawResponse = rawJson,
+                isLoading = false,
+                errorMessage = null
+            )
+        }
+
+        // 1. Automatic Local Persistence (Room DB - Offline First)
+        if (_uiState.value.isPollingEnabled) {
+            viewModelScope.launch {
+                localRepository.saveReading(
+                    timestamp = data.isotimestamp,
+                    bpm = data.puls,
+                    fitness = data.fitness,
+                    sessionId = currentSessionId,
+                    userId = currentUserId
+                )
+
+                // 2. Cloud Backup (Firestore - Online Sync / Backup)
+                if (authRepository.currentUser != null) {
+                    val result = firestoreRepository.saveReadingToCloud(
+                        sessionId = currentSessionId,
+                        timestamp = data.isotimestamp,
+                        bpm = data.puls,
+                        fitness = data.fitness
+                    )
+                    if (result.isSuccess) {
+                        localRepository.markAsSynced(listOf(data.isotimestamp))
+                    }
+                }
+            }
         }
     }
 
     /**
      * LEARNING POINT: Explicit Cloud-to-Local Sync (Pull-Sync)
      * Wird vom Nutzer über den Home-Screen-Button (Sync with Cloud) ausgelöst.
-     * Lädt historische Daten aus Firestore herunter und speichert sie in der lokalen Room Database.
      */
     fun syncFromCloud() {
         viewModelScope.launch {
@@ -133,11 +252,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * LEARNING POINT: Offline-First Synchronization (Push-Sync)
-     * Prüft, ob es lokal in Room ungesyncte Einträge für diesen Nutzer gibt (isSynced = 0),
-     * und lädt diese im Hintergrund nach Firestore hoch, sobald eine Verbindung besteht.
-     */
     private fun syncOfflineDataToCloud() {
         viewModelScope.launch {
             val user = authRepository.currentUser
@@ -158,9 +272,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Aktualisiert den provider-unabhängigen Authentifizierungsstatus im UI-Zustand.
-     */
     private fun updateAuthState() {
         val user = authRepository.currentUser
         _uiState.update { 
@@ -173,9 +284,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Meldet einen Benutzer mit E-Mail und Passwort via Firebase Auth an.
-     */
     fun signIn(email: String, pass: String) {
         if (email.isBlank() || pass.isBlank()) {
             showSnackbar(getStringResource(R.string.error_empty_credentials))
@@ -187,7 +295,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             result.fold(
                 onSuccess = { _ ->
                     updateAuthState()
-                    setSelectedSessionId(null) // Reset session selection for new user
+                    setSelectedSessionId(null)
                     syncOfflineDataToCloud()
                     _uiState.update { it.copy(isLoading = false, errorMessage = null) }
                     showSnackbar(getStringResource(R.string.success_signed_in))
@@ -201,9 +309,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Registriert einen neuen Benutzer bei Firebase Auth.
-     */
     fun signUp(email: String, pass: String) {
         if (email.isBlank() || pass.isBlank()) {
             showSnackbar(getStringResource(R.string.error_empty_credentials))
@@ -215,7 +320,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             result.fold(
                 onSuccess = { _ ->
                     updateAuthState()
-                    setSelectedSessionId(null) // Reset session selection for new user
+                    setSelectedSessionId(null)
                     syncOfflineDataToCloud()
                     _uiState.update { it.copy(isLoading = false, errorMessage = null) }
                     showSnackbar(getStringResource(R.string.success_account_created))
@@ -229,19 +334,13 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Meldet den aktuellen Benutzer von Firebase Auth ab.
-     */
     fun signOut() {
         authRepository.signOut()
         updateAuthState()
-        setSelectedSessionId(null) // Reset session selection for guest/new user
+        setSelectedSessionId(null)
         navigateTo(Screen.Home)
     }
 
-    /**
-     * Sendet eine E-Mail zum Zurücksetzen des Passworts.
-     */
     fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
         if (email.isBlank()) {
             onResult(false, getStringResource(R.string.error_empty_email))
@@ -256,9 +355,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Aktualisiert den Anzeigenamen (Nickname) des angemeldeten Benutzers in Firebase Auth.
-     */
     fun setNickname(newNickname: String) {
         viewModelScope.launch {
             if (authRepository.currentUser != null) {
@@ -275,7 +371,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    // --- 2. PERSISTENT STATE (Disk storage via DataStore) ---
     val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
         .stateIn(
             scope = viewModelScope,
@@ -283,16 +378,8 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             initialValue = PersistentUiState()
         )
 
-    // --- 3. DATABASE FILTERING & TRANSFORMATIONS (Room DB Reactive Pipeline) ---
-    
     data class HistoryFilter(val bpm: Int, val mins: Int, val sessionId: String?, val userId: String?)
 
-    /**
-     * LEARNING POINT: Reaktive Datenverarbeitung & Flow-Kombination mit Multi-User-Isolation
-     * 
-     * `fitnessHistoryLog` beobachtet den UI-Zustand (Filter wie Puls, Zeit, SessionID und UserID) 
-     * und lädt Daten automatisch reaktiv aus der Room Database für den aktuell aktiven Nutzer.
-     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val fitnessHistoryLog = uiState
         .map { state ->
@@ -316,9 +403,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             localRepository.getFilteredDataBySession(activeUser, activeSession, filter.bpm, timestamp)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /**
-     * LEARNING POINT: Datenquellen-Umschaltung (Live vs. Historisch)
-     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val activeGraphData = uiState
         .map { it.showLiveGraph }
@@ -334,7 +418,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- 4. DATA POLLING ENGINE (Network & Auto-Persistence) ---
     private var pollingJob: Job? = null
 
     fun setMinBpmFilter(value: Int) { _uiState.update { it.copy(minBpmFilter = value) } }
@@ -342,18 +425,30 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     fun setGraphSource(isLive: Boolean) { _uiState.update { it.copy(showLiveGraph = isLive) } }
     fun setSelectedSessionId(sessionId: String?) { _uiState.update { it.copy(selectedSessionId = sessionId) } }
     
-    /**
-     * Master Switch: Toggles the background data collection.
-     * Erzeugt jedes Mal eine neue SessionID, wenn Live-Streaming eingeschaltet wird.
-     */
     fun setPollingEnabled(enabled: Boolean) { 
         _uiState.update { it.copy(isPollingEnabled = enabled) } 
         if (enabled) {
             currentSessionId = generateNewSessionId()
             setSelectedSessionId(currentSessionId)
-            startPollingInternal()
+            
+            if (_uiState.value.dataSource == DataSource.HTTP) {
+                startPollingInternal()
+            } else if (_uiState.value.dataSource == DataSource.BLE) {
+                viewModelScope.launch {
+                    try {
+                        bleRepository.sendCommand(Esp32Command(LED = "H", LEDBlinken = true))
+                    } catch (e: Exception) { /* Ignore */ }
+                }
+            }
         } else {
             stopPollingInternal()
+            if (_uiState.value.dataSource == DataSource.BLE) {
+                viewModelScope.launch {
+                    try {
+                        bleRepository.sendCommand(Esp32Command(LED = "L", LEDBlinken = false))
+                    } catch (e: Exception) { /* Ignore */ }
+                }
+            }
         }
     }
 
@@ -374,12 +469,8 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         pollingJob = null
     }
 
-    /**
-     * Performs an HTTP request to get the latest fitness data.
-     */
     fun performHttpRequest() {
         viewModelScope.launch {
-            // Show loading indicator only for the very first request
             if (_uiState.value.lastReceivedData == null) {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             }
@@ -387,39 +478,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             try {
                 val data = httpRepository.fetchFitnessData()
                 val raw = httpRepository.fetchRawJson()
-                
-                _uiState.update { state -> 
-                    val newHistory = (state.fitnessHistory + data).takeLast(100)
-                    state.copy(
-                        lastReceivedData = data,
-                        fitnessHistory = newHistory,
-                        rawResponse = raw,
-                        isLoading = false,
-                        errorMessage = null
-                    )
-                }
-
-                // 1. Automatic Local Persistence (Room DB - Offline First) mit aktiver UserID
-                localRepository.saveReading(
-                    timestamp = data.isotimestamp,
-                    bpm = data.puls,
-                    fitness = data.fitness,
-                    sessionId = currentSessionId,
-                    userId = currentUserId
-                )
-
-                // 2. Cloud Backup (Firestore - Online Sync / Backup)
-                if (authRepository.currentUser != null) {
-                    val result = firestoreRepository.saveReadingToCloud(
-                        sessionId = currentSessionId,
-                        timestamp = data.isotimestamp,
-                        bpm = data.puls,
-                        fitness = data.fitness
-                    )
-                    if (result.isSuccess) {
-                        localRepository.markAsSynced(listOf(data.isotimestamp))
-                    }
-                }
+                handleNewFitnessData(data, raw)
             } catch (e: Exception) {
                 _uiState.update { it.copy(
                     errorMessage = "Network Error: ${e.localizedMessage}",
@@ -434,10 +493,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             localRepository.clearHistory()
         }
     }
-
-    // =========================================================================
-    // BOILERPLATE AREA: NAVIGATION HANDLING & HELPERS
-    // =========================================================================
 
     private val savedBackStack: List<Screen>? = savedStateHandle.get<String>("backstack_keys")?.let {
         try { Json.decodeFromString<List<Screen>>(it) } catch (e: Exception) { null }
@@ -470,30 +525,18 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Triggert das Anzeigen einer Snackbar in der UI.
-     */
     fun showSnackbar(message: String) {
         _uiState.update { it.copy(snackbarMessage = message) }
     }
 
-    /**
-     * Setzt die Snackbar-Nachricht nach dem Anzeigen im UI zurück.
-     */
     fun clearSnackbarMessage() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    /**
-     * Hilfsfunktion zum Auslesen von String-Ressourcen (vermeidet Boilerplate im ViewModel).
-     */
     private fun getStringResource(@StringRes resId: Int): String {
         return getApplication<Application>().getString(resId)
     }
 
-    /**
-     * Hilfsfunktion zum Auslesen von String-Ressourcen mit Formatierungsparametern.
-     */
     private fun getStringResource(@StringRes resId: Int, vararg formatArgs: Any): String {
         return getApplication<Application>().getString(resId, *formatArgs)
     }

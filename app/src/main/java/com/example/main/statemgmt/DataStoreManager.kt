@@ -16,10 +16,6 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 
 /**
  * A central DataStore manager that uses JSON serialization.
- * 
- * You usually don't need to change anything here.
- * This class handles saving/loading the entire 'PersistentUiState' object 
- * as a single JSON string.
  */
 class DataStoreManager(private val context: Context) {
 
@@ -52,5 +48,13 @@ class DataStoreManager(private val context: Context) {
             val updated = update(current)
             preferences[jsonKey] = Json.encodeToString(updated)
         }
+    }
+
+    suspend fun saveAutoConnect(enabled: Boolean) {
+        updatePersistentState { it.copy(autoConnectEnabled = enabled) }
+    }
+
+    suspend fun saveLastDevice(address: String) {
+        updatePersistentState { it.copy(lastUsedDeviceAddress = address) }
     }
 }

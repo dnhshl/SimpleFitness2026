@@ -9,10 +9,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.main.statemgmt.AppViewModel
+import com.example.main.statemgmt.ConnectionState
+import com.example.main.statemgmt.DataSource
 
 /**
  * The Home Screen template.
- * Displays the Live Data streaming switch and explicit Cloud Sync controls when authenticated.
+ * Displays data source selection (HTTP vs BLE), Live Data streaming switch, and Cloud Sync controls.
  */
 @Composable
 fun HomeScreen(viewModel: AppViewModel) {
@@ -26,6 +28,63 @@ fun HomeScreen(viewModel: AppViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // --- 0. DATA SOURCE SELECTOR (HTTP vs. BLE) ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "Livestream Data Source", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.setDataSource(DataSource.HTTP) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.dataSource == DataSource.HTTP) 
+                                MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (uiState.dataSource == DataSource.HTTP)
+                                MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("HTTP Internet")
+                    }
+                    Button(
+                        onClick = { viewModel.setDataSource(DataSource.BLE) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.dataSource == DataSource.BLE) 
+                                MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (uiState.dataSource == DataSource.BLE)
+                                MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("ESP32 BLE")
+                    }
+                }
+                if (uiState.dataSource == DataSource.BLE) {
+                    Text(
+                        text = if (uiState.connectionState == ConnectionState.Connected) 
+                            "Status: Connected to ESP32" 
+                        else "Status: Not connected (Go to ESP32 BLE tab to connect)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (uiState.connectionState == ConnectionState.Connected) 
+                            MaterialTheme.colorScheme.primary 
+                        else MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
         // --- 1. LIVE DATA SWITCH ---
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -46,7 +105,9 @@ fun HomeScreen(viewModel: AppViewModel) {
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = "Enable to auto-update Speed and Graph screens.",
+                        text = if (uiState.dataSource == DataSource.HTTP) 
+                            "Streaming via Internet (Ktor)" 
+                        else "Streaming via Bluetooth (ESP32)",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

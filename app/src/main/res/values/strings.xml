@@ -59,4 +59,11 @@
     <string name="error_nickname_update">Failed to update nickname: %s</string>
     <string name="error_login_required_nickname">You must be logged in to set a nickname.</string>
     <string name="success_cloud_synced">Cloud data successfully synchronized!</string>
+
+    <!-- BLE -->
+    <string name="tab_ble">ESP32 BLE</string>
+    <string name="title_ble">ESP32 Bluetooth Sensor</string>
+    <string name="btn_scan">Start Scan</string>
+    <string name="btn_stop_scan">Stop Scan</string>
+    <string name="btn_disconnect">Disconnect</string>
 </resources>

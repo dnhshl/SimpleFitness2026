@@ -20,6 +20,7 @@ room = "2.8.4"
 ksp = "2.3.6"
 firebaseBom = "33.9.0"
 googleServices = "4.4.2"
+kable = "0.36.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -62,6 +63,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+kable-core = { group = "com.juul.kable", name = "kable-core", version.ref = "kable" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

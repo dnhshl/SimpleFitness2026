@@ -13,6 +13,32 @@ data class FitnessData(
     val puls: Int
 )
 
+enum class DataSource {
+    HTTP, BLE
+}
+
+enum class ConnectionState {
+    Disconnected, Connecting, Connected
+}
+
+@Serializable
+data class DiscoveredDevice(
+    val name: String?,
+    val address: String
+)
+
+@Serializable
+data class Esp32Data(
+    val potiArray: List<Int> = emptyList(),
+    val ledstatus: String = ""
+)
+
+@Serializable
+data class Esp32Command(
+    val LED: String,
+    val LEDBlinken: Boolean
+)
+
 /**
  * 1. UI STATE (Volatile)
  */
@@ -26,6 +52,12 @@ data class UiState(
     val rawResponse: String = "",
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+
+    // Data Source Selection (HTTP vs. BLE)
+    val dataSource: DataSource = DataSource.HTTP,
+    val connectionState: ConnectionState = ConnectionState.Disconnected,
+    val isScanning: Boolean = false,
+    val foundDevices: List<DiscoveredDevice> = emptyList(),
 
     // NEW: Filtering and View Settings
     val minBpmFilter: Int = 0,
@@ -47,5 +79,7 @@ data class UiState(
  */
 @Serializable
 data class PersistentUiState(
-    val lastUsedTimestamp: Long = 0L
+    val lastUsedTimestamp: Long = 0L,
+    val autoConnectEnabled: Boolean = false,
+    val lastUsedDeviceAddress: String = ""
 )
