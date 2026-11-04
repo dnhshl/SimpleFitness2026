@@ -39,18 +39,31 @@ fun BleScreen(viewModel: AppViewModel) {
             // 1. Connection Status Card
             ConnectionStatusCard(uiState.connectionState, onDisconnect = { viewModel.disconnect() })
 
-            // 2. Scan Controls & Auto-Connect
+            // 2. Scan Controls & Last Device Connect (Point a, c)
             val persistentState by viewModel.persistentUiState.collectAsState()
             
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (uiState.connectionState == ConnectionState.Disconnected) {
-                    Button(
-                        onClick = {
-                            if (uiState.isScanning) viewModel.stopScanning() else viewModel.startScanning()
-                        },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(stringResource(if (uiState.isScanning) R.string.btn_stop_scan else R.string.btn_scan))
+                        Button(
+                            onClick = {
+                                if (uiState.isScanning) viewModel.stopScanning() else viewModel.startScanning()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(if (uiState.isScanning) R.string.btn_stop_scan else R.string.btn_scan))
+                        }
+
+                        Button(
+                            onClick = { viewModel.connectToLastDevice() },
+                            modifier = Modifier.weight(1f),
+                            enabled = persistentState.lastUsedDeviceAddress.isNotBlank()
+                        ) {
+                            Text("Connect Last")
+                        }
                     }
                 }
 
@@ -59,19 +72,14 @@ fun BleScreen(viewModel: AppViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Auto-Connect to last device", style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = persistentState.autoConnectEnabled,
-                        onCheckedChange = { viewModel.toggleAutoConnect(it) }
-                    )
-                }
-                
-                if (persistentState.autoConnectEnabled && persistentState.lastUsedDeviceAddress.isEmpty()) {
-                    Text(
-                        "Connect to a device manually first to enable auto-connect.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Column {
+                        Text("Last Device", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = if (persistentState.lastUsedDeviceAddress.isNotBlank()) persistentState.lastUsedDeviceAddress else "None saved",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
 
@@ -84,14 +92,6 @@ fun BleScreen(viewModel: AppViewModel) {
                     isScanning = uiState.isScanning,
                     onDeviceClick = { viewModel.connectToDevice(it.address) },
                     modifier = Modifier.weight(1f)
-                )
-            }
-
-            // 4. Error Message
-            uiState.errorMessage?.let { error ->
-                Text(
-                    text = stringResource(R.string.error_prefix, error),
-                    color = MaterialTheme.colorScheme.error
                 )
             }
         }

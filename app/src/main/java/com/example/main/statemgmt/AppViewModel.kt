@@ -26,6 +26,7 @@ import kotlinx.serialization.json.Json
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.CancellationException
 
 /**
  * The Central Control Center (ViewModel) of your App.
@@ -132,6 +133,9 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         _uiState.update { it.copy(isScanning = false) }
     }
 
+    /**
+     * CONNECT TO DEVICE (Point d: Graceful handling if device is not reachable)
+     */
     fun connectToDevice(address: String) {
         stopScanning()
         _uiState.update { it.copy(connectionState = ConnectionState.Connecting, errorMessage = null) }
@@ -140,7 +144,8 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                 val fitnessFlow = bleRepository.connect(address)
                 _uiState.update { it.copy(connectionState = ConnectionState.Connected, dataSource = DataSource.BLE) }
                 
-                viewModelScope.launch { dataStoreManager.saveLastDevice(address) }
+                // Save last used device via PersistentUiState (DataStoreManager unchanged)
+                dataStoreManager.updatePersistentState { it.copy(lastUsedDeviceAddress = address) }
 
                 bleCollectJob = viewModelScope.launch {
                     fitnessFlow.collect { fitnessData ->
@@ -148,7 +153,66 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                     }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(connectionState = ConnectionState.Disconnected, errorMessage = "Connection Error: ${e.localizedMessage}") }
+                Log.e("AppViewModel", "Failed to connect to $address: ${e.message}", e)
+                _uiState.update { 
+                    it.copy(
+                        connectionState = ConnectionState.Disconnected, 
+                        errorMessage = "Device not reachable: ${e.localizedMessage ?: "Unknown error"}"
+                    ) 
+                }
+                showSnackbar("Connection failed: Device not reachable.")
+            }
+        }
+    }
+
+    /**
+     * CONNECT TO LAST DEVICE (Point b: Scan briefly to populate BLE cache, then connect)
+     */
+    fun connectToLastDevice() {
+        viewModelScope.launch {
+            val lastAddress = persistentUiState.first().lastUsedDeviceAddress
+            if (lastAddress.isBlank()) {
+                showSnackbar("No last known device found.")
+                return@launch
+            }
+
+            _uiState.update { it.copy(connectionState = ConnectionState.Connecting, errorMessage = null) }
+            
+            try {
+                var found = false
+                val job = viewModelScope.launch {
+                    bleRepository.advertisements.collect { device ->
+                        if (device.address == lastAddress && !found) {
+                            found = true
+                            stopScanning()
+                            connectToDevice(device.address)
+                            throw CancellationException("Found")
+                        }
+                    }
+                }
+                startScanning()
+                delay(8000L) // Scan timeout
+                job.cancel()
+                stopScanning()
+
+                if (!found && _uiState.value.connectionState == ConnectionState.Connecting) {
+                    _uiState.update { 
+                        it.copy(
+                            connectionState = ConnectionState.Disconnected, 
+                            errorMessage = "Last device not found nearby."
+                        ) 
+                    }
+                    showSnackbar("Last device not found nearby.")
+                }
+            } catch (e: Exception) {
+                if (e.message != "Found") {
+                    _uiState.update { 
+                        it.copy(
+                            connectionState = ConnectionState.Disconnected, 
+                            errorMessage = "Connect Last Error: ${e.localizedMessage}"
+                        ) 
+                    }
+                }
             }
         }
     }
@@ -164,14 +228,13 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     fun toggleAutoConnect(enabled: Boolean) {
         viewModelScope.launch {
-            dataStoreManager.saveAutoConnect(enabled)
+            dataStoreManager.updatePersistentState { it.copy(autoConnectEnabled = enabled) }
         }
     }
 
     /**
      * LEARNING POINT: Unified Data Ingestion
-     * Verarbeitet neue Fitness-Daten unabhängig von der Quelle (HTTP oder BLE),
-     * aktualisiert den UI-Zustand, speichert lokal in Room und sichert in Firestore.
+     * Verarbeitet neue Fitness-Daten unabhängig von der Quelle (HTTP oder BLE).
      */
     private fun handleNewFitnessData(data: FitnessData, rawJson: String) {
         _uiState.update { state -> 
@@ -185,7 +248,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             )
         }
 
-        // 1. Automatic Local Persistence (Room DB - Offline First)
         if (_uiState.value.isPollingEnabled) {
             viewModelScope.launch {
                 localRepository.saveReading(
@@ -196,7 +258,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                     userId = currentUserId
                 )
 
-                // 2. Cloud Backup (Firestore - Online Sync / Backup)
                 if (authRepository.currentUser != null) {
                     val result = firestoreRepository.saveReadingToCloud(
                         sessionId = currentSessionId,
@@ -212,10 +273,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * LEARNING POINT: Explicit Cloud-to-Local Sync (Pull-Sync)
-     * Wird vom Nutzer über den Home-Screen-Button (Sync with Cloud) ausgelöst.
-     */
     fun syncFromCloud() {
         viewModelScope.launch {
             val user = authRepository.currentUser
@@ -425,7 +482,15 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     fun setGraphSource(isLive: Boolean) { _uiState.update { it.copy(showLiveGraph = isLive) } }
     fun setSelectedSessionId(sessionId: String?) { _uiState.update { it.copy(selectedSessionId = sessionId) } }
     
+    /**
+     * MASTER SWITCH (Point b: Connect when BLE live stream is triggered if not already connected)
+     */
     fun setPollingEnabled(enabled: Boolean) { 
+        if (enabled && _uiState.value.dataSource == DataSource.BLE && _uiState.value.connectionState != ConnectionState.Connected) {
+            showSnackbar("Please connect to ESP32 BLE device first.")
+            return
+        }
+
         _uiState.update { it.copy(isPollingEnabled = enabled) } 
         if (enabled) {
             currentSessionId = generateNewSessionId()
