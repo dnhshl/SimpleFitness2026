@@ -23,8 +23,7 @@ import com.example.main.ui.screens.*
 /**
  * REVERSE ENGINEERING LERNEINHEIT: MAIN ACTIVITY
  *
- * Hauptaktivität der App. Bindet das `AppViewModel` ein und umschließt
- * die UI mit dem `PermissionWrapper` für die Kamera-Freigabe.
+ * Hauptaktivität der App mit BottomBar-Navigation (Anleitung & KI-Würfel).
  */
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
@@ -64,6 +63,25 @@ fun MainAppScreen(viewModel: AppViewModel) {
                     )
                 )
             }
+        },
+        bottomBar = {
+            if (!isLandscape && currentScreen.showBottomBar) {
+                NavigationBar {
+                    MainTabs.forEach { config ->
+                        NavigationBarItem(
+                            selected = currentScreen == config.screen,
+                            onClick = { viewModel.navigateTo(config.screen) },
+                            label = { config.label?.let { Text(stringResource(it)) } },
+                            icon = {
+                                val icon = if (currentScreen == config.screen) config.activeIcon else config.inactiveIcon
+                                if (icon != null) {
+                                    Icon(imageVector = icon, contentDescription = null)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
@@ -78,6 +96,7 @@ fun MainAppScreen(viewModel: AppViewModel) {
                 NavEntry(screen) {
                     when (screen) {
                         is Screen.Home -> HomeScreen(viewModel)
+                        is Screen.Cube -> CubeScreen(viewModel)
                     }
                 }
             }

@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.main.repositories.GestureData
 import com.example.main.repositories.GestureRepository
+import com.example.main.repositories.HandGestureMode
 import com.example.main.ui.screens.Screen
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,11 +16,6 @@ import kotlinx.serialization.json.Json
 
 /**
  * ZENTRALES VIEWMODEL (Steuerzentrale der App).
- *
- * Das ViewModel verbindet das `GestureRepository` mit dem `UiState`:
- * 1. Es sammelt kontinuierlich die KI-Ergebnisse (`GestureData`) ein.
- * 2. Wenn eine Pinch-Geste erkannt wird (`isPinching == true`), aktualisiert es die Würfel-Position
- *    und -Rotation im `UiState`.
  */
 class AppViewModel(application: Application, private val savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
@@ -28,11 +24,11 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     // REPOSITORY FÜR LOKALE KI (MEDIAPIPE):
     val gestureRepository = GestureRepository(application)
 
-    // --- 1. UI STATE (Arbeitsspeicher) ---
+    // --- 1. UI STATE ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // --- 2. PERSISTENT STATE (Disk Storage) ---
+    // --- 2. PERSISTENT STATE ---
     val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
         .stateIn(
             scope = viewModelScope,
@@ -44,9 +40,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         observeGestureEvents()
     }
 
-    /**
-     * Beobachtet die vom GestureRepository emittierten KI-Daten.
-     */
     private fun observeGestureEvents() {
         viewModelScope.launch {
             gestureRepository.gestureState.collect { gestureData ->
@@ -55,49 +48,77 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
-    /**
-     * Verarbeitet die rohen KI-Daten und entscheidet über Würfelbewegung & Status.
-     */
     private fun processGestureData(gesture: GestureData) {
         _uiState.update { currentState ->
-            if (gesture.isPinching) {
-                // VERHALTEN BEIM GREIFEN:
-                // Der Würfel folgt direkt den Koordinaten der zusammengeführten Fingerkuppen
-                val targetX = gesture.pinchPositionX
-                val targetY = gesture.pinchPositionY
+            when (gesture.mode) {
+                HandGestureMode.PINCH -> {
+                    // MODUS 1: PINCH (GREIFEN & VERSCHIEBEN)
+                    // Würfel folgt der Fingerposition, 3D-Rotation bleibt unverändert
+                    currentState.copy(
+                        cubePositionX = gesture.pinchPositionX,
+                        cubePositionY = gesture.pinchPositionY,
+                        isCubeGrabbed = true,
+                        gestureMode = HandGestureMode.PINCH,
+                        pinchX = gesture.pinchPositionX,
+                        pinchY = gesture.pinchPositionY,
+                        tiltX = gesture.tiltX,
+                        tiltY = gesture.tiltY,
+                        rawDistance = gesture.rawDistance,
+                        handLandmarks = gesture.landmarks,
+                        isHandDetected = true
+                    )
+                }
+                HandGestureMode.FIST -> {
+                    // MODUS 2: FAUST (DREHEN AN DER STELLE)
+                    // Würfel dreht sich basierend auf der Faust-Orientierung, Position bleibt unverändert
+                    val targetRotX = gesture.tiltX
+                    val targetRotY = gesture.tiltY
 
-                // Sanfte Würfeldrehung basierend auf Handneigung & Bewegung
-                val newRotX = (currentState.cubeRotationX + (targetY - currentState.cubePositionY) * 50f) % 360f
-                val newRotY = (currentState.cubeRotationY + (targetX - currentState.cubePositionX) * 50f) % 360f
+                    val smoothRotX = currentState.cubeRotationX + (targetRotX - currentState.cubeRotationX) * 0.2f
+                    val smoothRotY = currentState.cubeRotationY + (targetRotY - currentState.cubeRotationY) * 0.2f
 
-                currentState.copy(
-                    cubePositionX = targetX,
-                    cubePositionY = targetY,
-                    cubeRotationX = newRotX,
-                    cubeRotationY = newRotY,
-                    isCubeGrabbed = true,
-                    pinchX = gesture.pinchPositionX,
-                    pinchY = gesture.pinchPositionY,
-                    rawDistance = gesture.rawDistance,
-                    gestureStatus = gesture.gestureName
-                )
-            } else {
-                // VERHALTEN BEIM LOSLASSEN:
-                // Würfel verbleibt an seiner letzten Position, wird als nicht gegriffen markiert
-                currentState.copy(
-                    isCubeGrabbed = false,
-                    pinchX = gesture.pinchPositionX,
-                    pinchY = gesture.pinchPositionY,
-                    rawDistance = gesture.rawDistance,
-                    gestureStatus = gesture.gestureName
-                )
+                    currentState.copy(
+                        cubeRotationX = smoothRotX,
+                        cubeRotationY = smoothRotY,
+                        isCubeGrabbed = false,
+                        gestureMode = HandGestureMode.FIST,
+                        pinchX = gesture.pinchPositionX,
+                        pinchY = gesture.pinchPositionY,
+                        tiltX = gesture.tiltX,
+                        tiltY = gesture.tiltY,
+                        rawDistance = gesture.rawDistance,
+                        handLandmarks = gesture.landmarks,
+                        isHandDetected = true
+                    )
+                }
+                HandGestureMode.OPEN_HAND -> {
+                    // MODUS 3: OFFENE HAND (RUHEZUSTAND / INAKTIV)
+                    // Keine Transformationen des Würfels, um versehentliche Auslösungen zu vermeiden
+                    currentState.copy(
+                        isCubeGrabbed = false,
+                        gestureMode = HandGestureMode.OPEN_HAND,
+                        pinchX = gesture.pinchPositionX,
+                        pinchY = gesture.pinchPositionY,
+                        tiltX = gesture.tiltX,
+                        tiltY = gesture.tiltY,
+                        rawDistance = gesture.rawDistance,
+                        handLandmarks = gesture.landmarks,
+                        isHandDetected = true
+                    )
+                }
+                HandGestureMode.NONE -> {
+                    // KEINE HAND ERKANNT
+                    currentState.copy(
+                        isCubeGrabbed = false,
+                        gestureMode = HandGestureMode.NONE,
+                        handLandmarks = emptyList(),
+                        isHandDetected = false
+                    )
+                }
             }
         }
     }
 
-    /**
-     * Wird von PermissionWrapper aufgerufen, wenn Kamera-Berechtigung gewährt wird.
-     */
     fun onCameraPermissionGranted(isGranted: Boolean) {
         _uiState.update { it.copy(isCameraPermissionGranted = isGranted) }
     }
@@ -114,7 +135,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
     private val savedBackStack: List<Screen>? = savedStateHandle.get<String>("backstack_keys")?.let {
         try { Json.decodeFromString<List<Screen>>(it) } catch (e: Exception) { null }
     }
-    
+
     val backStack = mutableStateListOf<Screen>().apply {
         addAll(savedBackStack ?: listOf(Screen.Home))
     }

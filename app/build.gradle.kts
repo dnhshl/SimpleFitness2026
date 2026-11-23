@@ -42,6 +42,12 @@ configure<ApplicationExtension> {
     androidResources {
         noCompress += "task"
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
