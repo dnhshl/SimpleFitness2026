@@ -3,33 +3,33 @@ package com.example.main.statemgmt
 import kotlinx.serialization.Serializable
 
 /**
- * Data model for the Fitness API response.
- * This matches the JSON structure: {"fitness":57.5, "isotimestamp":"...", "puls":87}
- */
-@Serializable
-data class FitnessData(
-    val fitness: Double,
-    val isotimestamp: String,
-    val puls: Int
-)
-
-/**
- * 1. UI STATE (Volatile)
+ * REVERSE ENGINEERING LERNEINHEIT: LOKALE KI & GESTENSTEUERUNG
+ *
+ * 1. UI STATE (Flüchtiger Haupt-Zustand im Arbeitsspeicher)
+ *
+ * Enthält alle Daten, die zur Darstellung des 3D-Würfels, des Kamera-Overlays
+ * und der KI-Erkennungssymbole auf dem Screen benötigt werden.
  */
 data class UiState(
-    // Current Data
-    val lastReceivedData: FitnessData? = null,
-    
-    // History for Graphing
-    val fitnessHistory: List<FitnessData> = emptyList(),
+    // WÜRFEL-TRANSFORMATIONEN:
+    val cubePositionX: Float = 0.5f,  // Normiert 0.0 (links) bis 1.0 (rechts)
+    val cubePositionY: Float = 0.4f,  // Normiert 0.0 (oben) bis 1.0 (unten)
+    val cubeRotationX: Float = 15f,   // Neigung um X-Achse in Grad
+    val cubeRotationY: Float = 45f,   // Neigung um Y-Achse in Grad
+    val isCubeGrabbed: Boolean = false, // True wenn Pinch-Geste aktiv ist
 
-    val rawResponse: String = "",
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    // ECHTZEIT FINGER-LANDMARK TRACKER (0.0 .. 1.0):
+    val pinchX: Float = 0.5f,
+    val pinchY: Float = 0.5f,
+    val rawDistance: Float = 1.0f,
+
+    // STATUS & FEHLERMELDUNGEN:
+    val gestureStatus: String = "Starte Kamera...",
+    val isCameraPermissionGranted: Boolean = false
 )
 
 /**
- * 2. PERSISTENT UI STATE (Saved to Disk)
+ * 2. PERSISTENT UI STATE (Speicherung auf Festplatte/DataStore)
  */
 @Serializable
 data class PersistentUiState(

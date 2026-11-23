@@ -38,6 +38,10 @@ configure<ApplicationExtension> {
     buildFeatures {
         compose = true
     }
+
+    androidResources {
+        noCompress += "task"
+    }
 }
 
 dependencies {
@@ -65,14 +69,12 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.datastore.preferences)
 
-    // Ktor dependencies for HTTP requests
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.android)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.ktor.client.logging)
+    // CameraX dependencies
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
-    // Vico Graphing Library
-    implementation(libs.vico.compose)
-    implementation(libs.vico.compose.m3)
+    // MediaPipe Tasks Vision (On-Device AI)
+    implementation(libs.mediapipe.tasks.vision)
 }

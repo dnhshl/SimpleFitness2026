@@ -5,28 +5,34 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import com.example.main.repositories.HttpRepository
+import com.example.main.repositories.GestureData
+import com.example.main.repositories.GestureRepository
 import com.example.main.ui.screens.Screen
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
- * The Central Control Center (ViewModel) of your App.
+ * ZENTRALES VIEWMODEL (Steuerzentrale der App).
+ *
+ * Das ViewModel verbindet das `GestureRepository` mit dem `UiState`:
+ * 1. Es sammelt kontinuierlich die KI-Ergebnisse (`GestureData`) ein.
+ * 2. Wenn eine Pinch-Geste erkannt wird (`isPinching == true`), aktualisiert es die Würfel-Position
+ *    und -Rotation im `UiState`.
  */
 class AppViewModel(application: Application, private val savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
     private val dataStoreManager = DataStoreManager(application)
-    private val httpRepository = HttpRepository(application)
 
-    // --- 1. UI STATE (Memory only) ---
+    // REPOSITORY FÜR LOKALE KI (MEDIAPIPE):
+    val gestureRepository = GestureRepository(application)
+
+    // --- 1. UI STATE (Arbeitsspeicher) ---
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // --- 2. PERSISTENT STATE (Disk storage) ---
+    // --- 2. PERSISTENT STATE (Disk Storage) ---
     val persistentUiState: StateFlow<PersistentUiState> = dataStoreManager.persistentUiState
         .stateIn(
             scope = viewModelScope,
@@ -34,75 +40,71 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
             initialValue = PersistentUiState()
         )
 
-    // --- 3. DATA POLLING ---
-    private var pollingJob: Job? = null
-    private var activePollingRequests = 0 // Track how many screens want polling
-
-    /**
-     * Starts fetching data from the API every X milliseconds.
-     */
-    fun startPolling(intervalMs: Long = 2000L) {
-        activePollingRequests++
-        
-        if (pollingJob?.isActive == true) return
-
-        pollingJob = viewModelScope.launch {
-            try {
-                while (true) {
-                    performHttpRequest()
-                    delay(intervalMs)
-                }
-            } catch (e: Exception) {
-                // Task was cancelled
-            }
-        }
+    init {
+        observeGestureEvents()
     }
 
     /**
-     * Stops the background data fetching.
+     * Beobachtet die vom GestureRepository emittierten KI-Daten.
      */
-    fun stopPolling() {
-        activePollingRequests--
-        if (activePollingRequests <= 0) {
-            pollingJob?.cancel()
-            pollingJob = null
-            activePollingRequests = 0
-        }
-    }
-
-    /**
-     * Performs an HTTP request to get the latest fitness data.
-     */
-    fun performHttpRequest() {
+    private fun observeGestureEvents() {
         viewModelScope.launch {
-            // Show loading indicator only for the very first request
-            if (_uiState.value.lastReceivedData == null) {
-                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            }
-            
-            try {
-                val data = httpRepository.fetchFitnessData()
-                val raw = httpRepository.fetchRawJson()
-                
-                _uiState.update { state -> 
-                    // Add the new FitnessData to our history (max 100 entries)
-                    val newHistory = (state.fitnessHistory + data).takeLast(100)
-                    
-                    state.copy(
-                        lastReceivedData = data,
-                        fitnessHistory = newHistory,
-                        rawResponse = raw,
-                        isLoading = false,
-                        errorMessage = null
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(
-                    errorMessage = "Network Error: ${e.localizedMessage}",
-                    isLoading = false
-                )}
+            gestureRepository.gestureState.collect { gestureData ->
+                processGestureData(gestureData)
             }
         }
+    }
+
+    /**
+     * Verarbeitet die rohen KI-Daten und entscheidet über Würfelbewegung & Status.
+     */
+    private fun processGestureData(gesture: GestureData) {
+        _uiState.update { currentState ->
+            if (gesture.isPinching) {
+                // VERHALTEN BEIM GREIFEN:
+                // Der Würfel folgt direkt den Koordinaten der zusammengeführten Fingerkuppen
+                val targetX = gesture.pinchPositionX
+                val targetY = gesture.pinchPositionY
+
+                // Sanfte Würfeldrehung basierend auf Handneigung & Bewegung
+                val newRotX = (currentState.cubeRotationX + (targetY - currentState.cubePositionY) * 50f) % 360f
+                val newRotY = (currentState.cubeRotationY + (targetX - currentState.cubePositionX) * 50f) % 360f
+
+                currentState.copy(
+                    cubePositionX = targetX,
+                    cubePositionY = targetY,
+                    cubeRotationX = newRotX,
+                    cubeRotationY = newRotY,
+                    isCubeGrabbed = true,
+                    pinchX = gesture.pinchPositionX,
+                    pinchY = gesture.pinchPositionY,
+                    rawDistance = gesture.rawDistance,
+                    gestureStatus = gesture.gestureName
+                )
+            } else {
+                // VERHALTEN BEIM LOSLASSEN:
+                // Würfel verbleibt an seiner letzten Position, wird als nicht gegriffen markiert
+                currentState.copy(
+                    isCubeGrabbed = false,
+                    pinchX = gesture.pinchPositionX,
+                    pinchY = gesture.pinchPositionY,
+                    rawDistance = gesture.rawDistance,
+                    gestureStatus = gesture.gestureName
+                )
+            }
+        }
+    }
+
+    /**
+     * Wird von PermissionWrapper aufgerufen, wenn Kamera-Berechtigung gewährt wird.
+     */
+    fun onCameraPermissionGranted(isGranted: Boolean) {
+        _uiState.update { it.copy(isCameraPermissionGranted = isGranted) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        gestureRepository.close()
     }
 
     // =========================================================================
