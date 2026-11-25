@@ -11,7 +11,7 @@ configure<ApplicationExtension> {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.simplefitness26"
+        applicationId = "com.example.simplemediapipe"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
