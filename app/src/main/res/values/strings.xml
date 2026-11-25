@@ -1,54 +1,43 @@
 <resources>
-    <string name="app_name">MediaPipe Gesture Control</string>
+    <string name="app_name">SimpleFitness AI</string>
 
     <!-- Navigation & Titles -->
     <string name="tab_home">Anleitung</string>
-    <string name="tab_cube">KI-Würfel</string>
-    <string name="title_home">Bedienung &amp; KI-Konzept</string>
-    <string name="title_cube">3D-Würfel Gestensteuerung</string>
+    <string name="tab_cube">Hand-AI</string>
+    <string name="title_home">Goniometrie &amp; KI-Konzept</string>
+    <string name="title_cube">Hand-Goniometer &amp; Reha</string>
     <string name="back_description">Zurück</string>
 
     <!-- HomeScreen Didactic Explanations -->
     <string name="home_welcome_title">Willkommen zur On-Device AI Lerneinheit</string>
-    <string name="home_welcome_desc">Diese App demonstriert die Echtzeit-Verarbeitung von Kameraframes mit Google MediaPipe HandLandmarker und die Übersetzung in 3D-Geometrie in Jetpack Compose.</string>
+    <string name="home_welcome_desc">Diese App demonstriert die Echtzeit-Signalverarbeitung mit Google MediaPipe HandLandmarker. Sie misst den Zeigefinger-Gelenkwinkel (Goniometrie) und zählt Reha-Beugezyklen bequem am Schreibtisch.</string>
 
-    <string name="gesture_pinch_title">1. Greifen &amp; Verschieben (Pinch)</string>
-    <string name="gesture_pinch_desc">Führe Daumen- und Zeigefingerspitze zusammen. Der 3D-Würfel wird erfasst (leuchtet grün) und folgt deiner Fingerbewegung flüssig über den Bildschirm.</string>
+    <string name="gesture_pinch_title">1. Biomechanische Winkelmessung (PIP)</string>
+    <string name="gesture_pinch_desc">Halt deine Hand vor die Frontkamera. Die App berechnet per Vektorgeometrie den Beugewinkel am Zeigefinger-Mittelgelenk (PIP = Landmarks 5, 6, 7).</string>
 
-    <string name="gesture_fist_title">2. Drehen an der Stelle (Faust)</string>
-    <string name="gesture_fist_desc">Schließe deine Hand zu einer Faust. Neige die Faust nach oben/unten oder links/rechts, um den 3D-Drahtgitter-Würfel räumlich zu rotieren.</string>
+    <string name="gesture_fist_title">2. Finger-Reha Wiederholungszähler</string>
+    <string name="gesture_fist_desc">Beuge deinen Finger (&lt; 105°) und strecke ihn danach wieder vollständig (&gt; 155°). Die State-Machine erkennt den vollständigen Zyklus und zählt +1.</string>
 
-    <string name="gesture_open_title">3. Ruhezustand (Offene Hand)</string>
-    <string name="gesture_open_desc">Halte deine Hand flach und offen vor die Kamera. Die App zeichnet das 21-Gelenke-Skelett, führt aber keine ungewollte Bewegung aus.</string>
+    <string name="gesture_open_title">3. Visualisierung &amp; Feedback</string>
+    <string name="gesture_open_desc">Das Skelett-Overlay hebt das Mess-Gelenk grün (gestreckt) oder orange (gebeugt) hervor und zeigt den Winkel sowie den Status im HUD an.</string>
 
-    <string name="btn_start_cube">Jetzt KI-Würfel ausprobieren ➔</string>
+    <string name="btn_start_cube">Hand-Goniometer starten ➔</string>
 
     <!-- Camera Permission -->
     <string name="permission_title">Kamerazugriff erforderlich</string>
-    <string name="permission_description">Für die On-Device AI Gestensteuerung mit MediaPipe wird der Zugriff auf die Frontkamera benötigt. Die Videoverarbeitung erfolgt zu 100% lokal auf deinem Gerät.</string>
+    <string name="permission_description">Für die On-Device AI Hand-Goniometrie mit MediaPipe wird Zugriff auf die Frontkamera benötigt. Die Bildverarbeitung erfolgt zu 100% lokal auf deinem Gerät.</string>
     <string name="permission_button">Kamera freigeben</string>
     <string name="permission_icon_desc">Kamera Berechtigung</string>
 
     <!-- Status Messages -->
-    <string name="status_label">Gesten-Status:</string>
+    <string name="status_label">Status:</string>
     <string name="status_searching">Suche Hand...</string>
     <string name="status_no_hand">Keine Hand im Kamerabild</string>
-    <string name="status_pinching">Pinch / Greifen (Distanz: %.2f)</string>
-    <string name="status_fist">Faust / Drehen (Neigung: %.0f°, %.0f°)</string>
-    <string name="status_open_hand">Offene Hand (Bereit)</string>
+    <string name="status_pinching">Goniometrie Aktiv</string>
+    <string name="status_fist">Beugung Erkannt</string>
+    <string name="status_open_hand">Finger Gestreckt</string>
     <string name="status_error">KI-Fehler: %s</string>
 
     <!-- Instructions -->
-    <string name="instruction_tip">💡 Faust = Drehen | Pinch = Greifen &amp; Verschieben | Offene Hand = Ruhe</string>
-
-    <!-- 3D Cube Faces -->
-    <string name="cube_face_front">Vorn 1</string>
-    <string name="cube_face_top">Oben 2</string>
-    <string name="cube_face_right">Rechts 3</string>
-    <string name="cube_face_left">Links 4</string>
-    <string name="cube_face_bottom">Unten 5</string>
-    <string name="cube_face_back">Hinten 6</string>
-
-    <string name="cube_state_grabbed">Gegriffen!</string>
-    <string name="cube_icon_desc">Cube Icon</string>
+    <string name="instruction_tip">💡 Hand vor die Frontkamera halten. Beugen (&lt; 105°) &amp; Strecken (&gt; 155°) zählt Reha-Zyklen.</string>
 </resources>

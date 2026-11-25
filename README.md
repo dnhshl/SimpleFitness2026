@@ -1,60 +1,62 @@
-# 🏃 SimpleFitness Educational App
+# 🖐️ SimpleFitness On-Device AI: Hand-Goniometrie & Reha-Trainer
 
-Welcome to the latest version of the **SimpleFitness** project! 
+Willkommen zur On-Device AI Lerneinheit für **Gesundheits- und Sportingenieurwesen**!
 
-While the initial version of **SimpleFitness** (from last term) was built upon your experience with the **SimpleSensor** app, this updated version takes that foundation and adds professional architectural concepts: **Adaptive UI** and **Advanced Visualization**.
-
-## 🎓 Learning Module: Configuration & Adaptivity
-This version introduces a "Configuration-First" approach. Instead of hard-coding buttons and bars, we define the app structure in one place (`AppConfig.kt`), and the UI adapts automatically.
-
-### 📱 1. Adaptive Navigation (The "Rail" Pattern)
-Mobile apps must work in both **Portrait** and **Landscape**. 
-*   **Portrait**: The app uses a standard `NavigationBar` (Bottom Bar).
-*   **Landscape**: To save vertical space for the graph, the app automatically switches to a `NavigationRail` (Side Bar) and hides the `TopAppBar`.
-*   **The Magic**: Both components are driven by the same list of screens in `AppConfig.kt`.
-
-### 📊 2. Graph Customization (Vico Library)
-We've moved beyond "default" charts to a professional, readable implementation:
-*   **Axis Control**: We use `ItemPlacer` to control how often labels appear.
-*   **Stability**: We fixed the "flicker" by giving the Y-axis a fixed width. This is a common requirement in live-data dashboards.
+Diese App demonstriert die Integration von lokaler künstlicher Intelligenz (**Google MediaPipe HandLandmarker**) mit **biomechanischer Signalverarbeitung (Goniometrie)** in einer modernen Jetpack Compose Android-App. Die Tests können bequem direkt **am Schreibtisch ("am Platz")** mit der Frontkamera durchgeführt werden.
 
 ---
 
-## 🏗️ Architecture Reminder
-We strictly follow the 3-layer architecture:
-1.  **Repository**: `HttpRepository.kt` manages the **Ktor** connection.
-2.  **ViewModel**: `AppViewModel.kt` handles data polling and the navigation state.
-3.  **UI**: `ui/screens/` displays the data. The entry point is `MainActivity.kt`.
+## 🏗️ Architektur & Signalverarbeitung
+
+Die App baut auf einer sauberen 3-Schichten-Architektur auf:
+
+1. **Kamera-Stream (`CameraXPreview.kt`)**: Kamera-Frames der Frontkamera werden in Echtzeit an die KI-Schicht übergeben.
+2. **On-Device KI Repository (`GestureRepository.kt`)**: Nutzt das vortrainierte `hand_landmarker.task` Modell zur Erkennung von **21 Hand-Gelenkpunkten (Landmarks)** in 3D/2D.
+3. **Biomechanische Signalverarbeitung (`HandMath.kt`)**: Berechnet den Gelenkwinkel (Goniometrie) am Zeigefinger-Mittelgelenk (**PIP Joint**: Landmarks 5 `MCP` $\rightarrow$ 6 `PIP` $\rightarrow$ 7 `DIP`) mittels Vektorgeometrie:
+   $$\theta = \arccos\left(\frac{\vec{v}_1 \cdot \vec{v}_2}{\|\vec{v}_1\| \|\vec{v}_2\|}\right) \times \frac{180}{\pi}$$
+4. **State Machine & Zähler (`AppViewModel.kt`)**: Zählt vollständige Beuge- und Streckzyklen in der Hand-Rehabilitation:
+   - Beugung erkannt: Winkeleinbruch $< 105^\circ \rightarrow$ `isFingerFlexed = true`
+   - Vollständige Streckung: Wiederanstieg $> 155^\circ \rightarrow$ `rehabRepCount + 1`
+5. **Echtzeit-Visualisierung (`CubeScreen.kt`)**: 
+   - `HandGoniometerOverlay`: Zeichnet das 21-Gelenke-Skelett und hebt das Zeigefinger-Mittelgelenk farblich hervor (Grün = gestreckt, Orange = gebeugt).
+   - `GoniometerHudCard`: Schwebende Statuskarte mit Reha-Zähler und Live-Winkel in Grad.
 
 ---
 
-## 🛠️ Student Tasks
+## 🔍 Reverse Engineering Lab: Auf den Spuren der Signale
 
-### Task 1: The "Automatic" UI (Configuration)
-Your "Control Center" is `AppConfig.kt`. 
-1.  **Modify**: Change the icons for the `Home` or `Graph` screens in `AppScreenConfigs`.
-2.  **Verify**: Run the app and rotate your phone. Notice how your new icons appear in both the Bottom Bar AND the Side Rail automatically.
+### 1. Das Handskelett & MediaPipe Landmarks
+* **Dateien**: [`GestureRepository.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/repositories/GestureRepository.kt) & [`CubeScreen.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/ui/screens/CubeScreen.kt)
+* **Aufgabe**: Untersucht, wie die 21 Hand-Landmarks von MediaPipe als normierte `Offset(x, y)` Koordinaten an das `AppViewModel` übergeben und im `HandGoniometerOverlay` auf Bildschirmpixel skaliert werden.
 
-### Task 2: Adding a New Feature
-Suppose you want to add a "Settings" tab.
-1.  **Action**: Add a new `ScreenConfig` object to the list in `AppConfig.kt`. Give it a title and an icon.
-2.  **Result**: Without touching any layout code, your new tab should appear in the navigation. (Note: Clicking it will show an error until you also add it to the `when` block in `MainActivity.kt`).
+### 2. Biomechanische Vektorgeometrie
+* **Datei**: [`HandMath.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/ai/HandMath.kt)
+* **Aufgabe**: Vollzieht nach, wie die beiden Vektoren $\vec{v}_1 = P_5 - P_6$ und $\vec{v}_2 = P_7 - P_6$ aus den Landmark-Koordinaten gebildet werden und wie das Skalarprodukt den Innenwinkel $\theta$ berechnet.
 
-### Task 3: Graph Precision
-In `GraphScreen.kt`, the Y-axis shows a label every 20 BPM.
-1.  **Modify**: Find the `VerticalAxis.ItemPlacer.step` and change it to show a label every **10 BPM**.
-2.  **Analyze**: Look at the `size = BaseAxis.Size.Fixed(72.dp)` line. Why is this fixed size important when the heart rate changes from 99 to 100?
+### 3. Die Reha-State-Machine
+* **Datei**: [`AppViewModel.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/statemgmt/AppViewModel.kt) (`processGestureData`)
+* **Aufgabe**: Nachvollziehen, warum Hysterese-Schwellenwerte ($105^\circ$ für Beugung, $155^\circ$ für Streckung) gewählt werden, um Prellen und Fehlzählungen bei kleinen Hand-Zuckungen zu vermeiden.
 
 ---
 
-## 📚 Helpful Resources
-*   **Vico Documentation**: [Axis customization](https://guide.vico.patrykandpatrick.com/core/axis/)
-*   **Material 3**: [Adaptive layouts with Navigation Rail](https://m3.material.io/components/navigation-rail/overview)
+## 🛠️ Aufgaben für Studierende
+
+### Aufgabe 1: Goniometrie-Messung analysieren & testen
+1. Startet den Tab **Hand-AI** (`CubeScreen`).
+2. Halture eure Hand vor die Frontkamera. Beugt den Zeigefinger und beobachtet die Live-Gradzahl im HUD sowie die Farbänderung am Mittelgelenk.
+3. Absolviert 5 vollständige Beuge- und Streckzyklen und prüft, ob der Reha-Zähler präzise hochzählt.
+
+### Aufgabe 2: Zweiten Gelenkwinkel hinzufügen (Mittelfinger PIP)
+Aktuell wird der Winkel des Zeigefingers gemessen. Eure Aufgabe ist es, einen zweiten Winkel für das **Mittelfinger-Mittelgelenk (PIP)** einzubauen:
+1. **Landmarks**: Nutzt die Mittelfinger-Landmarks 9 (`MCP`), 10 (`PIP`) und 11 (`DIP`).
+2. **Mathematik**: Ergänzt eine Funktion `calculateMiddlePipAngle` in [`HandMath.kt`](file:///C:/Users/Noll/Sciebo/MCAppsCompose/SimpleFitness2026V2/app/src/main/java/com/example/main/ai/HandMath.kt).
+3. **UI-Anzeige**: Zeigt den Mittelfinger-Winkel zusätzlich im HUD an.
+
+### Aufgabe 3: Ergonomie & Haltungs-Feedback (Form Feedback)
+1. Erweitert den Status-Text im HUD: Wenn der Finger beim Strecken nicht mindestens $160^\circ$ erreicht, soll eine Warnung *"Finger weiter strecken!"* eingeblendet werden, um eine unvollständige Bewegungsausführung zu verhindern.
 
 ---
 
-## 📁 Project Quick-Link
-*   **The Config**: `AppConfig.kt` -> Start here!
-*   **The Brain**: `AppViewModel.kt`.
-*   **The Layout**: `MainActivity.kt` -> See how it handles rotation.
-*   **The Screens**: `GraphScreen.kt`, `HomeScreen.kt`, `SpeedometerScreen.kt`.
+## 📚 Hilfreiche Ressourcen
+* **Google MediaPipe Hand Landmarker**: [Developer Guide](https://developers.google.com/mediapipe/solutions/vision/hand_landmarker)
+* **CameraX Android Guide**: [Official Documentation](https://developer.android.com/use-cases/camera/camerax)

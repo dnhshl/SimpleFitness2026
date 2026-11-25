@@ -5,17 +5,15 @@ import com.example.main.repositories.HandGestureMode
 import kotlinx.serialization.Serializable
 
 /**
- * REVERSE ENGINEERING LERNEINHEIT: LOKALE KI & GESTENSTEUERUNG
+ * REVERSE ENGINEERING LERNEINHEIT: LOKALE KI & HAND-GONIOMETRIE
  *
  * 1. UI STATE (Haupt-Zustand im Arbeitsspeicher)
  */
 data class UiState(
-    // WÜRFEL-TRANSFORMATIONEN:
-    val cubePositionX: Float = 0.5f,    // Normiert 0.0 (links) bis 1.0 (rechts)
-    val cubePositionY: Float = 0.4f,    // Normiert 0.0 (oben) bis 1.0 (unten)
-    val cubeRotationX: Float = 20f,     // Neigung um X-Achse in Grad
-    val cubeRotationY: Float = 35f,     // Neigung um Y-Achse in Grad
-    val isCubeGrabbed: Boolean = false, // True wenn Pinch-Geste aktiv ist
+    // BIOMECHANISCHE MESSWERTE (GONIOMETRIE & REHA-TRAINER):
+    val fingerPipAngle: Double = 180.0,   // Zeigefinger PIP-Gelenkwinkel in Grad
+    val rehabRepCount: Int = 0,           // Beuge-/Streckungs-Zähler
+    val isFingerFlexed: Boolean = false,  // State-Machine Zustand
 
     // GESTEN-MODUS:
     val gestureMode: HandGestureMode = HandGestureMode.NONE,

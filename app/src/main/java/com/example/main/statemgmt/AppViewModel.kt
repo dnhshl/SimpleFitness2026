@@ -21,7 +21,7 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
 
     private val dataStoreManager = DataStoreManager(application)
 
-    // REPOSITORY FÜR LOKALE KI (MEDIAPIPE):
+    // REPOSITORY FÜR LOKALE KI (MEDIAPIPE HAND LANDMARKER):
     val gestureRepository = GestureRepository(application)
 
     // --- 1. UI STATE ---
@@ -48,74 +48,63 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
         }
     }
 
+    /**
+     * REVERSE ENGINEERING LERNEINHEIT: STATE MACHINE FÜR REHA-WIEDERHOLUNGSZÄHLER
+     *
+     * 1. Erfasst den aktuellen PIP-Gelenkwinkel aus dem Repository.
+     * 2. Prüft Beugung (Finger gebeugt <= 105°).
+     * 3. Erkennt vollständige Streckung (Finger gestreckt >= 155°) nach einer Beugung -> Repetition +1!
+     */
     private fun processGestureData(gesture: GestureData) {
-        _uiState.update { currentState ->
-            when (gesture.mode) {
-                HandGestureMode.PINCH -> {
-                    // MODUS 1: PINCH (GREIFEN & VERSCHIEBEN)
-                    // Würfel folgt der Fingerposition, 3D-Rotation bleibt unverändert
-                    currentState.copy(
-                        cubePositionX = gesture.pinchPositionX,
-                        cubePositionY = gesture.pinchPositionY,
-                        isCubeGrabbed = true,
-                        gestureMode = HandGestureMode.PINCH,
-                        pinchX = gesture.pinchPositionX,
-                        pinchY = gesture.pinchPositionY,
-                        tiltX = gesture.tiltX,
-                        tiltY = gesture.tiltY,
-                        rawDistance = gesture.rawDistance,
-                        handLandmarks = gesture.landmarks,
-                        isHandDetected = true
-                    )
-                }
-                HandGestureMode.FIST -> {
-                    // MODUS 2: FAUST (DREHEN AN DER STELLE)
-                    // Würfel dreht sich basierend auf der Faust-Orientierung, Position bleibt unverändert
-                    val targetRotX = gesture.tiltX
-                    val targetRotY = gesture.tiltY
-
-                    val smoothRotX = currentState.cubeRotationX + (targetRotX - currentState.cubeRotationX) * 0.2f
-                    val smoothRotY = currentState.cubeRotationY + (targetRotY - currentState.cubeRotationY) * 0.2f
-
-                    currentState.copy(
-                        cubeRotationX = smoothRotX,
-                        cubeRotationY = smoothRotY,
-                        isCubeGrabbed = false,
-                        gestureMode = HandGestureMode.FIST,
-                        pinchX = gesture.pinchPositionX,
-                        pinchY = gesture.pinchPositionY,
-                        tiltX = gesture.tiltX,
-                        tiltY = gesture.tiltY,
-                        rawDistance = gesture.rawDistance,
-                        handLandmarks = gesture.landmarks,
-                        isHandDetected = true
-                    )
-                }
-                HandGestureMode.OPEN_HAND -> {
-                    // MODUS 3: OFFENE HAND (RUHEZUSTAND / INAKTIV)
-                    // Keine Transformationen des Würfels, um versehentliche Auslösungen zu vermeiden
-                    currentState.copy(
-                        isCubeGrabbed = false,
-                        gestureMode = HandGestureMode.OPEN_HAND,
-                        pinchX = gesture.pinchPositionX,
-                        pinchY = gesture.pinchPositionY,
-                        tiltX = gesture.tiltX,
-                        tiltY = gesture.tiltY,
-                        rawDistance = gesture.rawDistance,
-                        handLandmarks = gesture.landmarks,
-                        isHandDetected = true
-                    )
-                }
-                HandGestureMode.NONE -> {
-                    // KEINE HAND ERKANNT
-                    currentState.copy(
-                        isCubeGrabbed = false,
-                        gestureMode = HandGestureMode.NONE,
-                        handLandmarks = emptyList(),
-                        isHandDetected = false
-                    )
-                }
+        if (!gesture.isHandDetected) {
+            _uiState.update {
+                it.copy(
+                    isHandDetected = false,
+                    handLandmarks = emptyList(),
+                    gestureMode = HandGestureMode.NONE
+                )
             }
+            return
+        }
+
+        val angle = gesture.fingerPipAngle
+        val currentlyFlexed = _uiState.value.isFingerFlexed
+        var newRepCount = _uiState.value.rehabRepCount
+        var nextFlexedState = currentlyFlexed
+
+        // STATE MACHINE LOGIK:
+        if (angle <= 105.0) {
+            // Zustand 1: Finger wird gebeugt
+            nextFlexedState = true
+        } else if (angle >= 155.0 && currentlyFlexed) {
+            // Zustand 2: Finger wird wieder vollständig gestreckt nach einer Beugung -> Zyklen +1
+            nextFlexedState = false
+            newRepCount += 1
+        }
+
+        _uiState.update { currentState ->
+            currentState.copy(
+                fingerPipAngle = angle,
+                rehabRepCount = newRepCount,
+                isFingerFlexed = nextFlexedState,
+                gestureMode = gesture.mode,
+                pinchX = gesture.pinchPositionX,
+                pinchY = gesture.pinchPositionY,
+                tiltX = gesture.tiltX,
+                tiltY = gesture.tiltY,
+                rawDistance = gesture.rawDistance,
+                handLandmarks = gesture.landmarks,
+                isHandDetected = true
+            )
+        }
+    }
+
+    fun resetRehabRepCount() {
+        _uiState.update {
+            it.copy(
+                rehabRepCount = 0,
+                isFingerFlexed = false
+            )
         }
     }
 
