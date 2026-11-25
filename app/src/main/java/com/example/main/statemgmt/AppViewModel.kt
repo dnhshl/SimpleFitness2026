@@ -88,11 +88,6 @@ class AppViewModel(application: Application, private val savedStateHandle: Saved
                 rehabRepCount = newRepCount,
                 isFingerFlexed = nextFlexedState,
                 gestureMode = gesture.mode,
-                pinchX = gesture.pinchPositionX,
-                pinchY = gesture.pinchPositionY,
-                tiltX = gesture.tiltX,
-                tiltY = gesture.tiltY,
-                rawDistance = gesture.rawDistance,
                 handLandmarks = gesture.landmarks,
                 isHandDetected = true
             )

@@ -15,15 +15,10 @@ data class UiState(
     val rehabRepCount: Int = 0,           // Beuge-/Streckungs-Zähler
     val isFingerFlexed: Boolean = false,  // State-Machine Zustand
 
-    // GESTEN-MODUS:
+    // HAND-ZUSTAND:
     val gestureMode: HandGestureMode = HandGestureMode.NONE,
 
     // ECHTZEIT FINGER- & SKELETT-DATEN (Normiert 0.0 .. 1.0):
-    val pinchX: Float = 0.5f,
-    val pinchY: Float = 0.5f,
-    val tiltX: Float = 0f,              // Hand-Kippen Oben/Unten in Grad
-    val tiltY: Float = 0f,              // Hand-Kippen Links/Rechts in Grad
-    val rawDistance: Float = 1.0f,
     val handLandmarks: List<Offset> = emptyList(), // Alle 21 Handgelenke für das Skelett-Overlay
     val isHandDetected: Boolean = false,
 

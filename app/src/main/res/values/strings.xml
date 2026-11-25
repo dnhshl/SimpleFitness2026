@@ -3,25 +3,25 @@
 
     <!-- Navigation & Titles -->
     <string name="tab_home">Anleitung</string>
-    <string name="tab_cube">Hand-AI</string>
+    <string name="tab_goniometer">Hand-AI</string>
     <string name="title_home">Goniometrie &amp; KI-Konzept</string>
-    <string name="title_cube">Hand-Goniometer &amp; Reha</string>
+    <string name="title_goniometer">Hand-Goniometer &amp; Reha</string>
     <string name="back_description">Zurück</string>
 
     <!-- HomeScreen Didactic Explanations -->
     <string name="home_welcome_title">Willkommen zur On-Device AI Lerneinheit</string>
     <string name="home_welcome_desc">Diese App demonstriert die Echtzeit-Signalverarbeitung mit Google MediaPipe HandLandmarker. Sie misst den Zeigefinger-Gelenkwinkel (Goniometrie) und zählt Reha-Beugezyklen bequem am Schreibtisch.</string>
 
-    <string name="gesture_pinch_title">1. Biomechanische Winkelmessung (PIP)</string>
-    <string name="gesture_pinch_desc">Halt deine Hand vor die Frontkamera. Die App berechnet per Vektorgeometrie den Beugewinkel am Zeigefinger-Mittelgelenk (PIP = Landmarks 5, 6, 7).</string>
+    <string name="step_goniometry_title">1. Biomechanische Winkelmessung (PIP)</string>
+    <string name="step_goniometry_desc">Halt deine Hand vor die Frontkamera. Die App berechnet per Vektorgeometrie den Beugewinkel am Zeigefinger-Mittelgelenk (PIP = Landmarks 5, 6, 7).</string>
 
-    <string name="gesture_fist_title">2. Finger-Reha Wiederholungszähler</string>
-    <string name="gesture_fist_desc">Beuge deinen Finger (&lt; 105°) und strecke ihn danach wieder vollständig (&gt; 155°). Die State-Machine erkennt den vollständigen Zyklus und zählt +1.</string>
+    <string name="step_rehab_title">2. Finger-Reha Wiederholungszähler</string>
+    <string name="step_rehab_desc">Beuge deinen Finger (&lt; 105°) und strecke ihn danach wieder vollständig (&gt; 155°). Die State-Machine erkennt den vollständigen Zyklus und zählt +1.</string>
 
-    <string name="gesture_open_title">3. Visualisierung &amp; Feedback</string>
-    <string name="gesture_open_desc">Das Skelett-Overlay hebt das Mess-Gelenk grün (gestreckt) oder orange (gebeugt) hervor und zeigt den Winkel sowie den Status im HUD an.</string>
+    <string name="step_feedback_title">3. Visualisierung &amp; Feedback</string>
+    <string name="step_feedback_desc">Das Skelett-Overlay hebt das Mess-Gelenk grün (gestreckt) oder orange (gebeugt) hervor und zeigt den Winkel sowie den Status im HUD an.</string>
 
-    <string name="btn_start_cube">Hand-Goniometer starten ➔</string>
+    <string name="btn_start_goniometer">Hand-Goniometer starten ➔</string>
 
     <!-- Camera Permission -->
     <string name="permission_title">Kamerazugriff erforderlich</string>
@@ -33,9 +33,9 @@
     <string name="status_label">Status:</string>
     <string name="status_searching">Suche Hand...</string>
     <string name="status_no_hand">Keine Hand im Kamerabild</string>
-    <string name="status_pinching">Goniometrie Aktiv</string>
-    <string name="status_fist">Beugung Erkannt</string>
-    <string name="status_open_hand">Finger Gestreckt</string>
+    <string name="status_goniometry_active">Goniometrie Aktiv</string>
+    <string name="status_flexed">Beugung Erkannt</string>
+    <string name="status_extended">Finger Gestreckt</string>
     <string name="status_error">KI-Fehler: %s</string>
 
     <!-- Instructions -->

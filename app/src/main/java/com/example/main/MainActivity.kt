@@ -23,7 +23,7 @@ import com.example.main.ui.screens.*
 /**
  * REVERSE ENGINEERING LERNEINHEIT: MAIN ACTIVITY
  *
- * Hauptaktivität der App mit BottomBar-Navigation (Anleitung & KI-Würfel).
+ * Hauptaktivität der App mit BottomBar-Navigation (Anleitung & Hand-Goniometer).
  */
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
@@ -96,7 +96,7 @@ fun MainAppScreen(viewModel: AppViewModel) {
                 NavEntry(screen) {
                     when (screen) {
                         is Screen.Home -> HomeScreen(viewModel)
-                        is Screen.Cube -> CubeScreen(viewModel)
+                        is Screen.HandGoniometer -> HandGoniometerScreen(viewModel)
                     }
                 }
             }

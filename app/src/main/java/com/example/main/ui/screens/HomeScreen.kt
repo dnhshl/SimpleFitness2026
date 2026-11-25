@@ -5,9 +5,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BackHand
-import androidx.compose.material.icons.filled.PanTool
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,7 +23,7 @@ import com.example.main.statemgmt.AppViewModel
  * REVERSE ENGINEERING LERNEINHEIT: ANLEITUNG & BEDIENUNG
  * 
  * Der HomeScreen dient als didaktische Übersicht und erklärt den Studierenden
- * die 3 Hauptgesten für die KI-Steuerung.
+ * die Funktionsweise der On-Device AI Hand-Goniometrie.
  */
 @Composable
 fun HomeScreen(viewModel: AppViewModel) {
@@ -58,33 +58,33 @@ fun HomeScreen(viewModel: AppViewModel) {
         }
 
         Text(
-            text = "Gesten-Steuerung im Überblick:",
+            text = "Funktionsweise der KI-Analyse:",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 8.dp)
         )
 
-        // Geste 1: Pinch
+        // Schritt 1: Winkelmessung
         GestureExplanationCard(
-            title = stringResource(R.string.gesture_pinch_title),
-            description = stringResource(R.string.gesture_pinch_desc),
-            icon = Icons.Filled.TouchApp,
+            title = stringResource(R.string.step_goniometry_title),
+            description = stringResource(R.string.step_goniometry_desc),
+            icon = Icons.Filled.Straighten,
             badgeColor = MaterialTheme.colorScheme.primary
         )
 
-        // Geste 2: Faust
+        // Schritt 2: Reha-Zähler
         GestureExplanationCard(
-            title = stringResource(R.string.gesture_fist_title),
-            description = stringResource(R.string.gesture_fist_desc),
-            icon = Icons.Filled.BackHand,
+            title = stringResource(R.string.step_rehab_title),
+            description = stringResource(R.string.step_rehab_desc),
+            icon = Icons.Filled.FitnessCenter,
             badgeColor = MaterialTheme.colorScheme.tertiary
         )
 
-        // Geste 3: Offene Hand
+        // Schritt 3: Feedback
         GestureExplanationCard(
-            title = stringResource(R.string.gesture_open_title),
-            description = stringResource(R.string.gesture_open_desc),
-            icon = Icons.Filled.PanTool,
+            title = stringResource(R.string.step_feedback_title),
+            description = stringResource(R.string.step_feedback_desc),
+            icon = Icons.Filled.BackHand,
             badgeColor = MaterialTheme.colorScheme.secondary
         )
 
@@ -92,7 +92,7 @@ fun HomeScreen(viewModel: AppViewModel) {
 
         // Start Button
         Button(
-            onClick = { viewModel.navigateTo(Screen.Cube) },
+            onClick = { viewModel.navigateTo(Screen.HandGoniometer) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
@@ -100,7 +100,7 @@ fun HomeScreen(viewModel: AppViewModel) {
             Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = stringResource(R.string.btn_start_cube),
+                text = stringResource(R.string.btn_start_goniometer),
                 fontWeight = FontWeight.Bold
             )
         }
